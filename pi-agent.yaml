@@ -81,7 +81,7 @@ capabilities:
       authenticate: [git@github.com, git@ssh.github.com]
 
   # Pi keeps sessions, settings, and credentials in ~/.pi. Keep that across
-  # sandbox restarts and re-creation.
+  # sandbox restarts.
   - type: com.docker.sandbox/volume@1
     config:
       path: /home/agent/.pi
@@ -157,7 +157,7 @@ capabilities:
         - `$HOME` is `/home/agent`. The workspace is the mounted project directory at
           `$WORKSPACE_DIR`.
         - Pi state (sessions, settings) lives in `/home/agent/.pi`, which is a
-          persistent volume. It survives sandbox restarts and re-creation.
+          persistent volume. It survives sandbox restarts.
         - Pi reads stdin before it runs a one-shot prompt: piped input is prepended to
           the prompt, so an open stdin blocks `pi -p` until EOF. Headless callers must
           redirect stdin, for example `pi -p "..." </dev/null`, or use `pi-headless`,
