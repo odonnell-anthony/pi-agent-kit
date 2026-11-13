@@ -5,6 +5,8 @@ Docker Sandboxes v3 workload kit that runs [Pi](https://pi.dev) inside a sandbox
 > **This is not a regular Docker project.** Docker Sandboxes (`sbx`) is a Docker
 > product for running AI coding agents in isolated microVMs. It has its own CLI,
 > kit format, and capability model. Do not suggest `docker-compose`, `docker run`,
+[![ci](https://github.com/odonnell-anthony/pi-agent-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/odonnell-anthony/pi-agent-kit/actions/workflows/ci.yml)
+
 > or `Dockerfile` testing workflows. Use `sbx kit validate`, `sbx run`, and
 > `sbx exec` instead. See <https://docs.docker.com/ai/sandboxes/>.
 
@@ -76,6 +78,10 @@ sbx secret set github --command 'gh auth token'
 
 ## Use
 
+Examples assume the kit is at `./pi-agent` relative to the directory you run
+from; adjust the path to where you cloned it. `sbx` mounts the current directory
+as the workspace unless you pass another path.
+
 ```console
 # validate
 sbx kit validate ./pi-agent
@@ -88,7 +94,7 @@ sbx exec pi-kit -- bash -lc 'pi -p "list the files in this repo" </dev/null'
 sbx exec pi-kit -- pi-headless -p "list the files in this repo"
 
 # override arguments per sandbox
-sbx run --name pi-opus ./pi-agent --kit-arg pi-agent.model=anthropic/claude-opus-latest
+sbx run --name pi-opus ./pi-agent --kit-arg model=anthropic/claude-opus-latest
 ```
 
 The default model is `deepseek/deepseek-v4.1-flash-1017` with `thinking: high`.
@@ -97,7 +103,7 @@ create a new named sandbox to change them. If the default is unavailable on your
 OpenRouter account, override it with `--kit-arg`:
 
 ```console
-sbx run --name pi-kit ./pi-agent --kit-arg pi-agent.model=anthropic/claude-sonnet-latest
+sbx run --name pi-kit ./pi-agent --kit-arg model=anthropic/claude-sonnet-latest
 ```
 
 ## Local vs cloud
@@ -201,7 +207,7 @@ reports, otherwise the mapping is left behind.
 For the usual dev loop inside the sandbox:
 
 ```console
-sbx exec -it pi-kit -- bash -lc 'cd /home/agent/workspace && npm run dev -- --host 0.0.0.0'
+sbx exec -it pi-kit -- bash -lc 'cd "$WORKSPACE_DIR" && npm run dev -- --host 0.0.0.0'
 ```
 
 A server must listen on `0.0.0.0` (or `::`) inside the sandbox, not on
@@ -211,7 +217,7 @@ A server must listen on `0.0.0.0` (or `::`) inside the sandbox, not on
 
 ```console
 docker login
-docker buildx build ./pi-agent -f ./pi-agent/pi-agent.yaml \
+docker buildx build . -f pi-agent.yaml \
   --platform linux/amd64,linux/arm64 \
   --provenance=mode=min \
   -t docker.io/<NAMESPACE>/pi-agent:1.0.0 --push
@@ -224,6 +230,32 @@ Publish the digest, not just the tag, and have consumers verify:
 ```console
 sbx kit verify docker.io/<NAMESPACE>/pi-agent@sha256:<digest>
 sbx run --name pi-kit docker.io/<NAMESPACE>/pi-agent@sha256:<digest>
+```
+
+## CI
+
+`.github/workflows/ci.yml` runs on every push and pull request:
+
+- JSON-schema validation of `pi-agent.yaml` against the upstream v3 schema.
+- `yamllint --strict`, `shellcheck`, and `hadolint`.
+- A Buildx OCI build. The `# syntax=docker/sandbox-kit:3` frontend validates the
+  descriptor and capability shape during the build.
+
+`.github/workflows/smoke.yml` is manual (`workflow_dispatch`). It runs
+`scripts/smoke.sh` on a self-hosted runner with `sbx`, KVM, a `sbx-kit`
+container builder, and credential bindings. GitHub-hosted runners cannot run it
+because sandboxes need KVM.
+
+Run the same checks locally:
+
+```console
+uvx check-jsonschema --schemafile \
+  https://raw.githubusercontent.com/docker/sandbox-kit-spec/main/schema/kit.schema.json \
+  pi-agent.yaml
+uvx yamllint --strict -c .yamllint pi-agent.yaml
+shellcheck scripts/smoke.sh
+docker run --rm -i hadolint/hadolint < pi-agent.dockerfile
+BUILDX_BUILDER=sbx-kit ./scripts/smoke.sh
 ```
 
 ## Headless prompts

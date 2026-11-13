@@ -1,0 +1,37 @@
+name: smoke
+
+# Manual end-to-end test. Requires a self-hosted runner with:
+#   - sbx installed and logged in
+#   - Docker plus an OCI-capable container builder named sbx-kit
+#   - /dev/kvm available
+#   - OpenRouter (and optionally GitHub) credential bindings configured
+#
+# GitHub-hosted runners cannot run this: sandboxes need KVM.
+
+on:
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: Prompt sent to Pi
+        required: false
+        default: "Reply with exactly: OK"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate kit
+        env:
+          BUILDX_BUILDER: sbx-kit
+        run: sbx kit validate ./pi-agent
+
+      - name: Run smoke test
+        env:
+          BUILDX_BUILDER: sbx-kit
+          PROMPT: ${{ inputs.prompt }}
+        run: ./pi-agent/scripts/smoke.sh

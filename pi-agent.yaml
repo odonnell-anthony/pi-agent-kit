@@ -19,7 +19,7 @@ args:
     default: "deepseek/deepseek-v4.1-flash-1017"
   thinking:
     default: high
-    enum: [off, minimal, low, medium, high, xhigh, max]
+    enum: ["off", minimal, low, medium, high, xhigh, max]
 
 provides: ["pi@${{ kit.args.version }}"]
 
@@ -168,10 +168,10 @@ capabilities:
       cpu: 4.0
       memory: 8g
 
-  # Ports are published on demand from the host; the kit declares none.
-  #   sbx ports pi-kit --publish 0.0.0.0:8080:3000
-  # To grant a dev port from the kit itself, declare it and recreate the
-  # sandbox, for example:
-  #   - type: com.docker.sandbox/port@1
-  #     optional: true
-  #     config: {name: devserver, container: 3000}
+# Ports are published on demand from the host; the kit declares none.
+#   sbx ports pi-kit --publish 0.0.0.0:8080:3000
+# To grant a dev port from the kit itself, declare it and recreate the
+# sandbox, for example:
+#   - type: com.docker.sandbox/port@1
+#     optional: true
+#     config: {name: devserver, container: 3000}
