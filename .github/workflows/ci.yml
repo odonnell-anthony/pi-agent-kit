@@ -1,0 +1,71 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python linters
+        run: python -m pip install --quiet check-jsonschema yamllint
+
+      - name: Validate descriptor against the v3 schema
+        run: >
+          check-jsonschema
+          --schemafile https://raw.githubusercontent.com/docker/sandbox-kit-spec/main/schema/kit.schema.json
+          pi-agent.yaml
+
+      - name: Lint YAML
+        run: yamllint --strict -c .yamllint pi-agent.yaml
+
+      - name: Lint shell
+        run: shellcheck scripts/smoke.sh
+
+      - name: Lint Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: pi-agent.dockerfile
+          failure-threshold: error
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          name: kit-builder
+          driver: docker-container
+
+      # The `# syntax=docker/sandbox-kit:3` frontend validates the descriptor
+      # during the build, so a successful build gates grammar and capability
+      # shape in addition to the static checks in `lint`.
+      - name: Build kit to an OCI layout
+        run: |
+          docker buildx build --builder kit-builder -f pi-agent.yaml \
+            -t pi-agent:ci \
+            --output type=oci,dest=layout,tar=false .
+
+      - name: Show layout
+        run: find layout -type f | head -40
+
+      - name: Upload layout
+        uses: actions/upload-artifact@v4
+        with:
+          name: kit-layout
+          path: layout
+          retention-days: 7
