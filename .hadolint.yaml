@@ -1,0 +1,4 @@
+# ${GH_TOKEN} inside the /etc/gitconfig credential helper is intentionally
+# literal: git expands it at request time, not the build shell.
+ignored:
+  - SC2016
