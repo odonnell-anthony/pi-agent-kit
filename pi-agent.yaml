@@ -1,0 +1,177 @@
+# syntax=docker/sandbox-kit:3
+# yaml-language-server: $schema=https://raw.githubusercontent.com/docker/sandbox-kit-spec/main/schema/kit.schema.json
+schemaVersion: "3"
+kind: workload
+
+displayName: Pi coding agent
+description: Pi (pi-coding-agent) with Node.js, OpenRouter access through the sandbox proxy, and persistent sessions
+author: "Anthony O'Donnell <anthony.odonnell@outlook.com>"
+sourceUrl: https://github.com/odonnell-anthony/pi-agent-kit
+version: "1.0.0"
+licenses: [MIT]
+
+args:
+  version:
+    default: "1.5.2"
+    pattern: '^[0-9]+\.[0-9]+\.[0-9]+$'
+    buildArg: PI_VERSION
+  model:
+    default: "deepseek/deepseek-v4.1-flash-1017"
+  thinking:
+    default: high
+    enum: [off, minimal, low, medium, high, xhigh, max]
+
+provides: ["pi@${{ kit.args.version }}"]
+
+capabilities:
+  - type: com.docker.sandbox/sbx@1
+
+  - type: com.docker.sandbox/network-policy@2
+    config:
+      runtime:
+        allow:
+          - openrouter.ai:443
+          - github.com:443
+          - github.com:22
+          - ssh.github.com:443
+          - api.github.com:443
+          - uploads.github.com:443
+          - codeload.github.com:443
+          - objects.githubusercontent.com:443
+
+  - type: com.docker.sandbox/credential@1
+    description: OpenRouter API access
+    config:
+      service: openrouter
+      phase: runtime
+      apiKey:
+        name: OPENROUTER_API_KEY
+        proxyManaged: true
+        inject:
+          - domain: openrouter.ai
+            header: Authorization
+            format: "Bearer %s"
+
+  - type: com.docker.sandbox/credential@1
+    description: GitHub access for git and gh
+    optional: true
+    config:
+      service: github
+      phase: runtime
+      apiKey:
+        name: GH_TOKEN
+        proxyManaged: true
+        inject:
+          - {domain: github.com, header: Authorization, format: "Bearer %s"}
+          - {domain: api.github.com, header: Authorization, format: "Bearer %s"}
+          - {domain: uploads.github.com, header: Authorization, format: "Bearer %s"}
+
+  - type: com.docker.sandbox/git-identity@1
+    optional: true
+
+  # SSH to GitHub through the host's ssh-agent. Private keys stay on the host;
+  # the sandbox can only authenticate to github.com with them.
+  - type: com.docker.sandbox/ssh-agent@1
+    description: GitHub SSH access through the host agent
+    optional: true
+    config:
+      phase: runtime
+      unrestricted: false
+      sign: [git]
+      authenticate: [git@github.com, git@ssh.github.com]
+
+  # Pi keeps sessions, settings, and credentials in ~/.pi. Keep that across
+  # sandbox restarts and re-creation.
+  - type: com.docker.sandbox/volume@1
+    config:
+      path: /home/agent/.pi
+      size: 2g
+      mode: "0755"
+
+  - type: com.docker.sandbox/lifecycle@1
+    config:
+      files:
+        - path: /home/agent/.pi/agent/settings.json
+          content: |
+            {
+              "defaultProvider": "openrouter",
+              "defaultModel": "${{ kit.args.model }}",
+              "defaultThinkingLevel": "${{ kit.args.thinking }}",
+              "theme": "dark"
+            }
+          mode: "0644"
+
+  # Written to /home/agent/.pi/agent/AGENTS.md, which Pi loads as global
+  # instructions. agent-context@2 carries the body inline.
+  - type: com.docker.sandbox/agent-context@2
+    config:
+      filename: AGENTS.md
+      directory: /home/agent/.pi/agent
+      content: |
+        ## Sandbox environment
+
+        This sandbox runs Pi in Docker Sandboxes. Facts that differ from a normal host:
+
+        - `OPENROUTER_API_KEY` holds a sentinel, not the real key. The sandbox proxy
+          swaps in the real credential on requests to `openrouter.ai`. Never print,
+          copy, or transmit that variable.
+        - `GH_TOKEN` holds a sentinel too. `gh` and `git` over HTTPS work without
+          logging in: the proxy injects the real GitHub token on `github.com`,
+          `api.github.com`, and `uploads.github.com`. Do not run `gh auth login`.
+        - SSH remotes (`git@github.com:owner/repo.git`) work through the host's
+          forwarded ssh-agent at `/run/ssh-agent.sock`. The agent is bounded: it only
+          signs `git` namespaced data and only authenticates to `git@github.com`. Keys
+          cannot be read or exported from the agent.
+        - Runtime egress is limited to `openrouter.ai`, `github.com` (443 and 22),
+          `ssh.github.com`, `api.github.com`, `uploads.github.com`,
+          `codeload.github.com`, and `objects.githubusercontent.com`. Other hosts fail
+          unless the host added a policy rule for them (for example a LAN CIDR with
+          `sbx policy allow network --sandbox <name> 10.1.0.0/24`).
+        - A sandbox port is reachable from the host only after publication:
+          `sbx ports <name> --publish 0.0.0.0:8080:3000`. Bind dev servers to `0.0.0.0`
+          inside the sandbox, not `127.0.0.1`.
+        - Commits are attributed with the host's Git identity (`user.name`,
+          `user.email`) when the runtime supplies it.
+        - `$HOME` is `/home/agent`. The workspace is the mounted project directory at
+          `$WORKSPACE_DIR`.
+        - Pi state (sessions, settings) lives in `/home/agent/.pi`, which is a
+          persistent volume. It survives sandbox restarts and re-creation.
+        - Pi reads stdin before it runs a one-shot prompt: piped input is prepended to
+          the prompt, so an open stdin blocks `pi -p` until EOF. Headless callers must
+          redirect stdin, for example `pi -p "..." </dev/null`, or use `pi-headless`,
+          which does that. Interactive `pi` is unaffected.
+        - Exports needed by later shells belong in `/etc/sandbox-persistent.sh`, which
+          `BASH_ENV` sources for every non-interactive Bash command.
+        - Installed tooling comes from the kit image. Install extra packages with
+          `sudo apt-get` or `npm install -g`; they last for the sandbox lifetime only.
+
+  - type: com.docker.sandbox/agent-sessions@1
+    config:
+      prompt: ["-p", "{{.Prompt}}"]
+      continue: ["--continue"]
+      resume: ["--session", "{{.SessionID}}"]
+
+  # Interactive (TUI) verbs. Pi's TUI starts bare, takes a positional prompt,
+  # reopens a session with --session, continues with --continue, and shows the
+  # session picker with --resume.
+  - type: com.docker.sandbox/agent-interactive-sessions@1
+    optional: true
+    config:
+      prompt: ["{{.Prompt}}"]
+      resume: ["--session", "{{.SessionID}}"]
+      continue: ["--continue"]
+      newSession: []
+      sessionPicker: ["--resume"]
+
+  - type: com.docker.sandbox/resources@1
+    config:
+      cpu: 4.0
+      memory: 8g
+
+  # Ports are published on demand from the host; the kit declares none.
+  #   sbx ports pi-kit --publish 0.0.0.0:8080:3000
+  # To grant a dev port from the kit itself, declare it and recreate the
+  # sandbox, for example:
+  #   - type: com.docker.sandbox/port@1
+  #     optional: true
+  #     config: {name: devserver, container: 3000}
