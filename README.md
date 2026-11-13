@@ -1,12 +1,12 @@
 # pi-agent kit
 
+[![build](https://img.shields.io/github/actions/workflow/status/odonnell-anthony/pi-agent-kit/ci.yml?branch=main&label=build)](https://github.com/odonnell-anthony/pi-agent-kit/actions/workflows/ci.yml)
+
 Docker Sandboxes v3 workload kit that runs [Pi](https://pi.dev) inside a sandbox.
 
 > **This is not a regular Docker project.** Docker Sandboxes (`sbx`) is a Docker
 > product for running AI coding agents in isolated microVMs. It has its own CLI,
 > kit format, and capability model. Do not suggest `docker-compose`, `docker run`,
-[![ci](https://github.com/odonnell-anthony/pi-agent-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/odonnell-anthony/pi-agent-kit/actions/workflows/ci.yml)
-
 > or `Dockerfile` testing workflows. Use `sbx kit validate`, `sbx run`, and
 > `sbx exec` instead. See <https://docs.docker.com/ai/sandboxes/>.
 
