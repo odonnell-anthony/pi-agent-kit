@@ -25,6 +25,13 @@ sbx run --name "$NAME" -d "$KIT" "$WORKSPACE"
 echo "== pi version =="
 sbx exec "$NAME" -- bash -lc 'pi --version' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$'
 
+echo "== mcp =="
+sbx exec "$NAME" -- bash -lc 'test -s /home/agent/.pi/agent/mcp.json'
+sbx exec "$NAME" -- bash -lc 'grep -q mcp-gateway.docker.internal /home/agent/.pi/agent/mcp.json'
+mcp="$(sbx exec "$NAME" -- bash -lc 'timeout 60 pi mcp list')"
+printf '%s\n' "$mcp"
+printf '%s' "$mcp" | grep -q "connected"
+
 echo "== prompt =="
 out="$(sbx exec "$NAME" -- bash -lc "pi-headless -p \"$PROMPT\"")"
 printf '%s\n' "$out"

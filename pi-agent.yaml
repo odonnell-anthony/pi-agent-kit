@@ -7,7 +7,7 @@ displayName: Pi coding agent
 description: Pi (pi-coding-agent) with Node.js, OpenRouter access through the sandbox proxy, and persistent sessions
 author: "Anthony O'Donnell"
 sourceUrl: https://github.com/odonnell-anthony/pi-agent-kit
-version: "1.0.0"
+version: "1.1.0"
 licenses: [MIT]
 
 args:
@@ -100,6 +100,25 @@ capabilities:
               "theme": "dark"
             }
           mode: "0644"
+      install:
+        - user: agent
+          env: [MCP_GATEWAY_URL, MCP_SENTINEL_TOKEN_NAME]
+          description: Seed Pi's MCP config with the sandbox gateway
+          command: |
+            f=/home/agent/.pi/agent/mcp.json
+            [ -n "$MCP_GATEWAY_URL" ] && [ -n "$MCP_SENTINEL_TOKEN_NAME" ] || exit 0
+            [ -f "$f" ] && exit 0
+            cat > "$f" <<EOF
+            {
+              "mcpServers": {
+                "mcp-gateway": {
+                  "type": "http",
+                  "url": "$MCP_GATEWAY_URL",
+                  "headers": { "Authorization": "Bearer $MCP_SENTINEL_TOKEN_NAME" }
+                }
+              }
+            }
+            EOF
 
   # Written to /home/agent/.pi/agent/AGENTS.md, which Pi loads as global
   # instructions. agent-context@2 carries the body inline.
