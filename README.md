@@ -11,7 +11,7 @@ A Docker Sandboxes v3 workload kit. `sbx` runs Pi in its own microVM with a
 restricted egress allow-list, proxy-managed credentials, and a persistent
 `~/.pi` volume. The kit pins a base image, installs
 `@earendil-works/pi-coding-agent`, and wires OpenRouter plus GitHub over HTTPS
-and SSH.
+and SSH. It also seeds Pi's MCP config with the sandbox gateway.
 
 It builds `docker.io/sbx/shell-image:latest`, pinned to its multi-arch index
 digest
@@ -136,6 +136,63 @@ sbx exec pi-kit -- pi-headless -p "x"                # same, wrapped
 `pi-headless` is `/usr/local/bin/pi-headless` in the image: `exec pi "$@" </dev/null`.
 Interactive `pi` (the TUI) is unaffected; do not use the wrapper for it.
 
+## MCP servers
+
+Docker Sandboxes runs an MCP gateway in every sandbox and keeps server
+registrations on the host. This kit seeds Pi's user MCP config with that
+gateway on creation, so Pi sees whatever servers the sandbox exposes.
+
+Register a server once on the host, then attach it at creation:
+
+```console
+sbx mcp add notion --url https://mcp.notion.com/mcp
+sbx run --name pi-mcp --static-mcp notion ./pi-agent
+```
+
+Without `--static-mcp` the sandbox is in dynamic mode and Pi sees the gateway
+tools `mcp-find`, `mcp-add`, and `mcp-config-set`. Attach a server to a running
+sandbox:
+
+```console
+sbx mcp load notion --sandbox pi-mcp
+```
+
+Check what Pi sees:
+
+```console
+sbx exec pi-mcp -- bash -lc 'pi mcp list'
+```
+
+The seeded file is `/home/agent/.pi/agent/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "mcp-gateway": {
+      "type": "http",
+      "url": "http://mcp-gateway.docker.internal/mcp",
+      "headers": { "Authorization": "Bearer proxy-managed" }
+    }
+  }
+}
+```
+
+The install hook writes it from `MCP_GATEWAY_URL` and `MCP_SENTINEL_TOKEN_NAME`,
+only when the file does not already exist, so your edits survive recreation.
+
+Notes:
+
+- MCP traffic goes through the gateway. The sandbox reaches
+  `mcp-gateway.docker.internal` through the sandbox proxy; the host-side gateway
+  talks to the servers. The kit's network policy does not need the MCP hosts.
+- Local stdio servers run on the host with host permissions. Register only
+  trusted commands.
+- Add servers with `sbx mcp`, not `pi mcp add`. A server added directly in Pi's
+  config must pass the kit's network policy to connect.
+- Disable MCP for a session with `pi --no-mcp`, or remove the seeded file.
+- Local sandboxes use the local gateway. Cloud sandboxes use a separate cloud
+  gateway; the install hook seeds whichever variables the runtime provides.
+
 ## Capabilities
 
 | Capability | Effect |
@@ -147,7 +204,7 @@ Interactive `pi` (the TUI) is unaffected; do not use the wrapper for it.
 | `ssh-agent@1` | host ssh-agent forwarded into the sandbox; bounded to `git` signatures and `git@github.com` logins. Private keys never enter the sandbox |
 | `git-identity@1` | commit `user.name` / `user.email` come from the host Git config |
 | `volume@1` | `/home/agent/.pi` (2g, block) persists sessions and settings across stop and re-creation |
-| `lifecycle@1` | writes `/home/agent/.pi/agent/settings.json` from the `model` and `thinking` arguments |
+| `lifecycle@1` | writes `/home/agent/.pi/agent/settings.json` from the `model` and `thinking` arguments, and seeds `/home/agent/.pi/agent/mcp.json` from the gateway environment on creation |
 | `agent-context@2` | writes `/home/agent/.pi/agent/AGENTS.md` from the inline body (Pi's global instructions) |
 | `agent-sessions@1` | declares headless `-p`, `--continue`, `--session` verbs. Declaration only: sbx accepts but does not execute them |
 | `agent-interactive-sessions@1` | declares TUI verbs. Optional; sbx ignores it |
@@ -182,7 +239,8 @@ The kit targets **local** sandboxes. Cloud (`sbx --cloud`) degrades:
 | `ssh-agent@1` | full | unsupported; optional, skipped |
 | `volume@1` | block, survives re-create | ordinary sandbox disk |
 
-Use local sandboxes for full behaviour.
+Use local sandboxes for full behaviour. MCP uses a separate gateway in cloud
+sandboxes; the kit seeds whichever gateway variables the runtime provides.
 
 ## Data and sessions
 
@@ -270,6 +328,9 @@ A server must listen on `0.0.0.0` (or `::`) inside the sandbox, not on
 | `Permission denied (publickey)` over SSH | Host key not on GitHub, or agent not forwarded | `gh ssh-key add ...`; enable SSH-agent forwarding |
 | Host unreachable, connection refused | Host not in the network policy | `sbx policy allow network --sandbox pi-kit <host>` |
 | Published port not reachable | Service bound to `127.0.0.1` | Bind `0.0.0.0` inside the sandbox |
+| `pi mcp list` reports a connection error, or the gateway returns 503 | Gateway listener lost after a `sandboxd` restart | Recreate the sandbox |
+| MCP server tools are missing | Server not attached | `sbx mcp ls`; attach with `--static-mcp` at create or `sbx mcp load` |
+| A server added directly with `pi mcp add` cannot connect | Its host is outside the kit network policy | Use `sbx mcp` (host-side gateway) instead, or add the host |
 | `gh auth login` prompts inside | Normal; do not log in | The proxy injects the token from `GH_TOKEN` |
 | New capability not applied | Existing sandboxes keep their original kit | Remove and recreate the sandbox |
 
@@ -336,6 +397,10 @@ sbx run --name pi-kit docker.io/<NAMESPACE>/pi-agent@sha256:<digest>
   entrypoint.
 - `sbx kit validate --offline` does not work for v3 source kits; it needs the
   builder.
+- The install hook seeds `/home/agent/.pi/agent/mcp.json` from
+  `MCP_GATEWAY_URL` and `MCP_SENTINEL_TOKEN_NAME`, only when the file does not
+  exist. The header value is a sentinel; the proxy substitutes the real
+  credential.
 - Existing sandboxes keep their original kit; recreate the sandbox after
   changing capabilities.
 

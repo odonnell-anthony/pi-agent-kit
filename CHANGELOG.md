@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.0
+
+- Seed Pi's MCP config with the sandbox MCP gateway via a lifecycle install
+  hook, so registered servers are available without manual configuration.
+
 ## 1.0.0
 
 First public release.
