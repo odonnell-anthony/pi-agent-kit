@@ -3,7 +3,9 @@
 ## 1.1.0
 
 - Seed Pi's MCP config with the sandbox MCP gateway via a lifecycle install
-  hook, so registered servers are available without manual configuration.
+  hook, so registered servers are available without manual configuration. The
+  hook creates the agent directory when absent, so first-run on a fresh volume
+  works.
 
 ## 1.0.0
 

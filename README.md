@@ -178,7 +178,8 @@ The seeded file is `/home/agent/.pi/agent/mcp.json`:
 ```
 
 The install hook writes it from `MCP_GATEWAY_URL` and `MCP_SENTINEL_TOKEN_NAME`,
-only when the file does not already exist, so your edits survive recreation.
+only when the file is absent or empty, so a file you manage is not overwritten
+at creation.
 
 Notes:
 
@@ -203,7 +204,7 @@ Notes:
 | `credential@1` (github) | `GH_TOKEN` holds a sentinel; proxy injects the real token on `github.com`, `api.github.com`, `uploads.github.com`. `gh` is preinstalled in the base image |
 | `ssh-agent@1` | host ssh-agent forwarded into the sandbox; bounded to `git` signatures and `git@github.com` logins. Private keys never enter the sandbox |
 | `git-identity@1` | commit `user.name` / `user.email` come from the host Git config |
-| `volume@1` | `/home/agent/.pi` (2g, block) persists sessions and settings across stop and re-creation |
+| `volume@1` | `/home/agent/.pi` (2g, block) persists sessions and settings across stop and restart |
 | `lifecycle@1` | writes `/home/agent/.pi/agent/settings.json` from the `model` and `thinking` arguments, and seeds `/home/agent/.pi/agent/mcp.json` from the gateway environment on creation |
 | `agent-context@2` | writes `/home/agent/.pi/agent/AGENTS.md` from the inline body (Pi's global instructions) |
 | `agent-sessions@1` | declares headless `-p`, `--continue`, `--session` verbs. Declaration only: sbx accepts but does not execute them |
@@ -237,23 +238,23 @@ The kit targets **local** sandboxes. Cloud (`sbx --cloud`) degrades:
 | `agent-context@2` | writes `/home/agent/.pi/agent/AGENTS.md` | writes one profile in `/home/agent`, so Pi does not load it |
 | `git-identity@1` | full | unsupported; optional, skipped |
 | `ssh-agent@1` | full | unsupported; optional, skipped |
-| `volume@1` | block, survives re-create | ordinary sandbox disk |
+| `volume@1` | block, survives stop and restart | ordinary sandbox disk |
 
 Use local sandboxes for full behaviour. MCP uses a separate gateway in cloud
 sandboxes; the kit seeds whichever gateway variables the runtime provides.
 
 ## Data and sessions
 
-Pi state lives in `/home/agent/.pi`: sessions, `settings.json`, and `AGENTS.md`.
-That path is a `volume@1` block volume, scoped to the sandbox name and retained
-across stop and re-creation.
+Pi state lives in `/home/agent/.pi`: sessions, `settings.json`, `AGENTS.md`, and
+the seeded `mcp.json`. That path is a `volume@1` block volume, scoped to the
+sandbox name and preserved across `sbx stop` and a restart.
 
 - **Sessions**: resume inside the sandbox with `pi --session <id>` or
   `pi --continue`. `agent-sessions@1` is declaration-only here, so `sbx` never
   runs the declared verbs.
-- **Reset**: a block volume survives sandbox removal and re-creation under the
-  same name, so removing alone does not clear Pi. `sbx reset` clears all sandbox
-  state; confirm its scope with `sbx reset --help` before relying on it.
+- **Reset**: treat `sbx rm` as a reset. Some sbx versions reattach the volume
+  when you recreate the same name; confirm with `sbx rm --help`. `sbx reset`
+  clears all sandbox state.
 
 ## Extending
 

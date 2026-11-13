@@ -107,8 +107,10 @@ capabilities:
           command: |
             f=/home/agent/.pi/agent/mcp.json
             [ -n "$MCP_GATEWAY_URL" ] && [ -n "$MCP_SENTINEL_TOKEN_NAME" ] || exit 0
-            [ -f "$f" ] && exit 0
-            cat > "$f" <<EOF
+            [ -s "$f" ] && exit 0
+            mkdir -p "$(dirname "$f")"
+            tmp="$f.tmp"
+            cat > "$tmp" <<EOF
             {
               "mcpServers": {
                 "mcp-gateway": {
@@ -119,6 +121,7 @@ capabilities:
               }
             }
             EOF
+            mv "$tmp" "$f"
 
   # Written to /home/agent/.pi/agent/AGENTS.md, which Pi loads as global
   # instructions. agent-context@2 carries the body inline.
