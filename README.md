@@ -399,8 +399,8 @@ sbx run --name pi-kit docker.io/<NAMESPACE>/pi-agent@sha256:<digest>
 - `sbx kit validate --offline` does not work for v3 source kits; it needs the
   builder.
 - The install hook seeds `/home/agent/.pi/agent/mcp.json` from
-  `MCP_GATEWAY_URL` and `MCP_SENTINEL_TOKEN_NAME`, only when the file does not
-  exist. The header value is a sentinel; the proxy substitutes the real
+  `MCP_GATEWAY_URL` and `MCP_SENTINEL_TOKEN_NAME`, only when the file is absent
+  or empty. The header value is a sentinel; the proxy substitutes the real
   credential.
 - Existing sandboxes keep their original kit; recreate the sandbox after
   changing capabilities.
