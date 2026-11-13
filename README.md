@@ -2,59 +2,83 @@
 
 [![build](https://img.shields.io/github/actions/workflow/status/odonnell-anthony/pi-agent-kit/ci.yml?branch=main&label=build)](https://github.com/odonnell-anthony/pi-agent-kit/actions/workflows/ci.yml)
 
-Docker Sandboxes v3 workload kit that runs [Pi](https://pi.dev) inside a sandbox.
+Run [Pi](https://pi.dev) in an isolated Docker Sandbox. This is a v3 workload kit
+for `sbx`, Docker's microVM sandbox CLI.
 
-> **This is not a regular Docker project.** Docker Sandboxes (`sbx`) is a Docker
-> product for running AI coding agents in isolated microVMs. It has its own CLI,
-> kit format, and capability model. Do not suggest `docker-compose`, `docker run`,
-> or `Dockerfile` testing workflows. Use `sbx kit validate`, `sbx run`, and
-> `sbx exec` instead. See <https://docs.docker.com/ai/sandboxes/>.
+## What it is
 
-## What it builds
+A Docker Sandboxes v3 workload kit. `sbx` runs Pi in its own microVM with a
+restricted egress allow-list, proxy-managed credentials, and a persistent
+`~/.pi` volume. The kit pins a base image, installs
+`@earendil-works/pi-coding-agent`, and wires OpenRouter plus GitHub over HTTPS
+and SSH.
 
-`docker.io/sbx/shell-image:latest`, pinned to its multi-arch index digest
-(`sha256:8953132089940e30f1387cfe8e77b504356ebbe48e02b15eed28e935f20ee732`; Ubuntu
-26.04, Node 22.22.1, git, rg, python3, `agent` user uid 1000), plus
+It builds `docker.io/sbx/shell-image:latest`, pinned to its multi-arch index
+digest
+(`sha256:8953132089940e30f1387cfe8e77b504356ebbe48e02b15eed28e935f20ee732`;
+Ubuntu 26.04, Node 22.22.1, git, rg, python3, `agent` user uid 1000), plus
 `@earendil-works/pi-coding-agent` installed globally under
 `/usr/local/share/npm-global`, with `pi` as the launch command.
+
+> **Not a regular Docker project.** `sbx` has its own CLI, kit format, and
+> capability model. Do not use `docker-compose`, `docker run`, or Dockerfile
+> testing workflows. Use `sbx kit validate`, `sbx run`, and `sbx exec`. See
+> <https://docs.docker.com/ai/sandboxes/>.
+
+## Quick start
+
+Requires `sbx` v0.51.0 or later, an OCI-capable Buildx builder, and credential
+bindings. See [Requirements](#requirements) and [Prerequisites](#prerequisites).
+
+Examples assume the kit is at `./pi-agent` relative to the directory you run
+from; adjust the path to where you cloned it. `sbx` mounts the current directory
+as the workspace unless you pass another path.
+
+```console
+# one-time: create the builder
+docker buildx create --name sbx-kit --driver docker-container
+export BUILDX_BUILDER=sbx-kit
+
+# validate and run (workspace = current directory)
+sbx kit validate ./pi-agent
+sbx run --name pi-kit ./pi-agent
+```
+
+Headless, with stdin closed:
+
+```console
+sbx exec pi-kit -- pi-headless -p "list the files in this repo"
+```
+
+Change the model per sandbox. A sandbox keeps the kit arguments it was created
+with.
+
+```console
+sbx run --name pi-opus ./pi-agent --kit-arg model=anthropic/claude-opus-latest
+```
 
 ## Requirements
 
 - `sbx` v0.51.0 or later. `agent-context@2` needs v0.51.0; `git-identity@1` and
   `ssh-agent@1` need v0.48.0.
-- Docker with an OCI-capable Buildx builder (see [Prerequisites](#prerequisites)).
+- Docker with an OCI-capable Buildx builder.
 - Host Git `user.name` and `user.email` for commit attribution.
 - An OpenRouter API key, and a GitHub credential or SSH key for GitHub access.
 
 Hosts: Linux and macOS, on `linux/amd64` and `linux/arm64`.
 
-## Capabilities
-
-| Capability | Effect |
-| --- | --- |
-| `sbx@1` | sbx launches `pi` under bash as `agent`; provides `WORKSPACE_DIR`, `SANDBOX_NAME`, `SANDBOX_ID`, `IS_SANDBOX` |
-| `network-policy@2` | runtime egress limited to `openrouter.ai`, `github.com` (443 and 22), `ssh.github.com`, `api.github.com`, `uploads.github.com`, `codeload.github.com`, `objects.githubusercontent.com` |
-| `credential@1` (openrouter) | `OPENROUTER_API_KEY` holds the sentinel `proxy-managed`; host proxy sets `Authorization: Bearer <real key>` on `openrouter.ai` |
-| `credential@1` (github) | `GH_TOKEN` holds a sentinel; proxy injects the real token on `github.com`, `api.github.com`, `uploads.github.com`. `gh` is preinstalled in the base image |
-| `ssh-agent@1` | host ssh-agent forwarded into the sandbox; bounded to `git` signatures and `git@github.com` logins. Private keys never enter the sandbox |
-| `git-identity@1` | commit `user.name` / `user.email` come from the host Git config |
-| `volume@1` | `/home/agent/.pi` (2g, block) persists sessions and settings across stop and re-creation |
-| `lifecycle@1` | writes `/home/agent/.pi/agent/settings.json` from the `model` and `thinking` arguments |
-| `agent-context@2` | writes `/home/agent/.pi/agent/AGENTS.md` from the inline body (Pi's global instructions) |
-| `agent-sessions@1` | declares headless `-p`, `--continue`, `--session` verbs. Declaration only: sbx accepts but does not execute them |
-| `agent-interactive-sessions@1` | declares TUI verbs. Optional; sbx ignores it |
-| `resources@1` | defaults to 4 CPU, 8 GiB |
-
 ## Prerequisites
 
-Host buildx needs an OCI-capable builder, because sbx builds source kits with
-`docker buildx build --output type=oci`, which the `docker` driver cannot export:
+Host buildx needs an OCI-capable builder, because `sbx` builds source kits with
+`docker buildx build --output type=oci`, which the `docker` driver cannot
+export:
 
 ```console
 docker buildx create --name sbx-kit --driver docker-container
+export BUILDX_BUILDER=sbx-kit
 ```
 
-`.bashrc` exports `BUILDX_BUILDER=sbx-kit` for this.
+Add the export to `.bashrc` to keep it across shells.
 
 The kit needs approved credential bindings, recorded in
 `~/.config/sbx/credentials.yaml`:
@@ -76,35 +100,73 @@ The GitHub secret can track the host CLI:
 sbx secret set github --command 'gh auth token'
 ```
 
-## Use
+## Configuration
 
-Examples assume the kit is at `./pi-agent` relative to the directory you run
-from; adjust the path to where you cloned it. `sbx` mounts the current directory
-as the workspace unless you pass another path.
+The kit exposes three arguments:
 
-```console
-# validate
-sbx kit validate ./pi-agent
+| Argument | Default | Notes |
+| --- | --- | --- |
+| `model` | `deepseek/deepseek-v4.1-flash-1017` | OpenRouter model ID |
+| `thinking` | `high` | `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` |
+| `version` | `1.5.2` | Pi release, applied as a build arg |
 
-# run (workspace = current directory)
-sbx run --name pi-kit ./pi-agent
+Pass them with `--kit-arg name=value`. Use `--kit-arg kit.name=value` to target
+one kit when several are composed. Arguments are baked when the sandbox is
+created; change them by creating a new named sandbox.
 
-# headless — stdin must be closed, or Pi waits for EOF forever
-sbx exec pi-kit -- bash -lc 'pi -p "list the files in this repo" </dev/null'
-sbx exec pi-kit -- pi-headless -p "list the files in this repo"
-
-# override arguments per sandbox
-sbx run --name pi-opus ./pi-agent --kit-arg model=anthropic/claude-opus-latest
-```
-
-The default model is `deepseek/deepseek-v4.1-flash-1017` with `thinking: high`.
-Both are kit arguments; a sandbox keeps the arguments it was created with, so
-create a new named sandbox to change them. If the default is unavailable on your
-OpenRouter account, override it with `--kit-arg`:
+If the default model is unavailable on your account, override it:
 
 ```console
 sbx run --name pi-kit ./pi-agent --kit-arg model=anthropic/claude-sonnet-latest
 ```
+
+## Headless prompts
+
+Pi reads stdin before running a one-shot prompt: piped input is prepended to the
+prompt. A terminal keeps stdin open, so `sbx exec ... -- pi -p "x"` produces no
+output and blocks until `sbx` reports `context canceled`.
+
+Always close stdin, or use the bundled wrapper:
+
+```console
+sbx exec pi-kit -- bash -lc 'pi -p "x" </dev/null'   # explicit
+sbx exec pi-kit -- pi-headless -p "x"                # same, wrapped
+```
+
+`pi-headless` is `/usr/local/bin/pi-headless` in the image: `exec pi "$@" </dev/null`.
+Interactive `pi` (the TUI) is unaffected; do not use the wrapper for it.
+
+## Capabilities
+
+| Capability | Effect |
+| --- | --- |
+| `sbx@1` | sbx launches `pi` under bash as `agent`; provides `WORKSPACE_DIR`, `SANDBOX_NAME`, `SANDBOX_ID`, `IS_SANDBOX` |
+| `network-policy@2` | runtime egress limited to `openrouter.ai`, `github.com` (443 and 22), `ssh.github.com`, `api.github.com`, `uploads.github.com`, `codeload.github.com`, `objects.githubusercontent.com` |
+| `credential@1` (openrouter) | `OPENROUTER_API_KEY` holds the sentinel `proxy-managed`; host proxy sets `Authorization: Bearer <real key>` on `openrouter.ai` |
+| `credential@1` (github) | `GH_TOKEN` holds a sentinel; proxy injects the real token on `github.com`, `api.github.com`, `uploads.github.com`. `gh` is preinstalled in the base image |
+| `ssh-agent@1` | host ssh-agent forwarded into the sandbox; bounded to `git` signatures and `git@github.com` logins. Private keys never enter the sandbox |
+| `git-identity@1` | commit `user.name` / `user.email` come from the host Git config |
+| `volume@1` | `/home/agent/.pi` (2g, block) persists sessions and settings across stop and re-creation |
+| `lifecycle@1` | writes `/home/agent/.pi/agent/settings.json` from the `model` and `thinking` arguments |
+| `agent-context@2` | writes `/home/agent/.pi/agent/AGENTS.md` from the inline body (Pi's global instructions) |
+| `agent-sessions@1` | declares headless `-p`, `--continue`, `--session` verbs. Declaration only: sbx accepts but does not execute them |
+| `agent-interactive-sessions@1` | declares TUI verbs. Optional; sbx ignores it |
+| `resources@1` | defaults to 4 CPU, 8 GiB |
+
+## Git and GitHub
+
+Both transports work; the kit does not rewrite remotes.
+
+- **HTTPS** is proxy-managed. `gh` and `git` authenticate with the sentinel in
+  `GH_TOKEN`; never run `gh auth login` inside a sandbox.
+- **SSH** uses the host agent, forwarded into the sandbox at
+  `/run/ssh-agent.sock`. `git@github.com:` remotes use it, so private keys stay
+  on the host. Egress to `github.com:22` is allowed. The key must be registered
+  on the GitHub account:
+
+  ```console
+  gh ssh-key add ~/.ssh/id_ed25519.pub --title "$(hostname)"
+  ```
 
 ## Local vs cloud
 
@@ -121,21 +183,6 @@ The kit targets **local** sandboxes. Cloud (`sbx --cloud`) degrades:
 | `volume@1` | block, survives re-create | ordinary sandbox disk |
 
 Use local sandboxes for full behaviour.
-
-## Git and GitHub
-
-Both transports work; the kit does not rewrite remotes.
-
-- **HTTPS** — proxy-managed. `gh` and `git` authenticate with the sentinel in
-  `GH_TOKEN`; never run `gh auth login` inside a sandbox.
-- **SSH** — the host agent is forwarded into the sandbox at
-  `/run/ssh-agent.sock`. `git@github.com:` remotes use it, so private keys stay
-  on the host. Egress to `github.com:22` is allowed. The key must be registered
-  on the GitHub account:
-
-  ```console
-  gh ssh-key add ~/.ssh/id_ed25519.pub --title "$(hostname)"
-  ```
 
 ## Data and sessions
 
@@ -174,8 +221,8 @@ sbx policy ls                             # rules, scopes, and IDs
 sbx policy rm network --id <RULE_ID> --sandbox pi-kit --force
 ```
 
-Policy rules apply within about five seconds, no restart needed. The host's
-LAN address is reachable, and so is any service it binds on `0.0.0.0`.
+Policy rules apply within about five seconds, no restart needed. The host's LAN
+address is reachable, and so is any service it binds on `0.0.0.0`.
 
 A host service bound only to `127.0.0.1` is not reachable that way. The kit
 route for that is the `host-port@1` capability, which relays one host loopback
@@ -201,8 +248,8 @@ sbx ports pi-kit --unpublish 0.0.0.0:8080:3000/tcp4
 
 The binding is done by the host-side `sbx` process, so `0.0.0.0` exposes the
 sandbox service to your LAN exactly like any local server would, with no extra
-firewall rule. Unpublish with the same protocol suffix that `sbx ports`
-reports, otherwise the mapping is left behind.
+firewall rule. Unpublish with the same protocol suffix that `sbx ports` reports,
+otherwise the mapping is left behind.
 
 For the usual dev loop inside the sandbox:
 
@@ -213,24 +260,18 @@ sbx exec -it pi-kit -- bash -lc 'cd "$WORKSPACE_DIR" && npm run dev -- --host 0.
 A server must listen on `0.0.0.0` (or `::`) inside the sandbox, not on
 `127.0.0.1`, or the forwarded connection is refused.
 
-## Publish
+## Troubleshooting
 
-```console
-docker login
-docker buildx build . -f pi-agent.yaml \
-  --platform linux/amd64,linux/arm64 \
-  --provenance=mode=min \
-  -t docker.io/<NAMESPACE>/pi-agent:1.0.0 --push
-sbx kit sign docker.io/<NAMESPACE>/pi-agent:1.0.0
-sbx kit verify docker.io/<NAMESPACE>/pi-agent:1.0.0
-```
-
-Publish the digest, not just the tag, and have consumers verify:
-
-```console
-sbx kit verify docker.io/<NAMESPACE>/pi-agent@sha256:<digest>
-sbx run --name pi-kit docker.io/<NAMESPACE>/pi-agent@sha256:<digest>
-```
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `OCI exporter is not supported for the docker driver` | Buildx is using the docker driver | `docker buildx create --name sbx-kit --driver docker-container`, export `BUILDX_BUILDER=sbx-kit` |
+| `pi -p` prints nothing and hangs, then `context canceled` | Pi blocks on open stdin | `pi -p "..." </dev/null`, or use `pi-headless` |
+| `401` or model not found on first prompt | OpenRouter binding missing or model unavailable | `sbx secret set openrouter`; override `--kit-arg model=...` |
+| `Permission denied (publickey)` over SSH | Host key not on GitHub, or agent not forwarded | `gh ssh-key add ...`; enable SSH-agent forwarding |
+| Host unreachable, connection refused | Host not in the network policy | `sbx policy allow network --sandbox pi-kit <host>` |
+| Published port not reachable | Service bound to `127.0.0.1` | Bind `0.0.0.0` inside the sandbox |
+| `gh auth login` prompts inside | Normal; do not log in | The proxy injects the token from `GH_TOKEN` |
+| New capability not applied | Existing sandboxes keep their original kit | Remove and recreate the sandbox |
 
 ## CI
 
@@ -258,34 +299,24 @@ docker run --rm -i hadolint/hadolint < pi-agent.dockerfile
 BUILDX_BUILDER=sbx-kit ./scripts/smoke.sh
 ```
 
-## Headless prompts
-
-Pi reads stdin before running a one-shot prompt: piped input is prepended to the
-prompt. A terminal keeps stdin open, so `sbx exec … -- pi -p "x"` produces no
-output and blocks until `sbx` reports `context canceled`.
-
-Always close stdin, or use the bundled wrapper:
+## Publish
 
 ```console
-sbx exec pi-kit -- bash -lc 'pi -p "x" </dev/null'   # explicit
-sbx exec pi-kit -- pi-headless -p "x"                # same, wrapped
+docker login
+docker buildx build . -f pi-agent.yaml \
+  --platform linux/amd64,linux/arm64 \
+  --provenance=mode=min \
+  -t docker.io/<NAMESPACE>/pi-agent:1.0.0 --push
+sbx kit sign docker.io/<NAMESPACE>/pi-agent:1.0.0
+sbx kit verify docker.io/<NAMESPACE>/pi-agent:1.0.0
 ```
 
-`pi-headless` is `/usr/local/bin/pi-headless` in the image: `exec pi "$@" </dev/null`.
-Interactive `pi` (the TUI) is unaffected; do not use the wrapper for it.
+Publish the digest, not just the tag, and have consumers verify:
 
-## Troubleshooting
-
-| Symptom | Cause | Fix |
-| --- | --- | --- |
-| `OCI exporter is not supported for the docker driver` | Buildx is using the docker driver | `docker buildx create --name sbx-kit --driver docker-container`, export `BUILDX_BUILDER=sbx-kit` |
-| `pi -p` prints nothing and hangs, then `context canceled` | Pi blocks on open stdin | `pi -p "..." </dev/null`, or use `pi-headless` |
-| `401` or model not found on first prompt | OpenRouter binding missing or model unavailable | `sbx secret set openrouter`; override `--kit-arg pi-agent.model=...` |
-| `Permission denied (publickey)` over SSH | Host key not on GitHub, or agent not forwarded | `gh ssh-key add ...`; enable SSH-agent forwarding |
-| Host unreachable, connection refused | Host not in the network policy | `sbx policy allow network --sandbox pi-kit <host>` |
-| Published port not reachable | Service bound to `127.0.0.1` | Bind `0.0.0.0` inside the sandbox |
-| `gh auth login` prompts inside | Normal; do not log in | The proxy injects the token from `GH_TOKEN` |
-| New capability not applied | Existing sandboxes keep their original kit | Remove and recreate the sandbox |
+```console
+sbx kit verify docker.io/<NAMESPACE>/pi-agent@sha256:<digest>
+sbx run --name pi-kit docker.io/<NAMESPACE>/pi-agent@sha256:<digest>
+```
 
 ## Notes
 
@@ -296,7 +327,7 @@ Interactive `pi` (the TUI) is unaffected; do not use the wrapper for it.
   overwrites the header with a real `Authorization: Bearer`. SSH uses the
   forwarded host agent, so the GitHub account needs the public key registered.
 - Add hosts to the network-policy capability if Pi must reach anything else;
-  use `sbx policy allow network` for LAN addresses you don't want baked into
+  use `sbx policy allow network` for LAN addresses you do not want baked into
   the kit.
 - The base image is pinned by digest. Update the `FROM` line deliberately when
   moving to a newer `shell-image`.
@@ -307,3 +338,7 @@ Interactive `pi` (the TUI) is unaffected; do not use the wrapper for it.
   builder.
 - Existing sandboxes keep their original kit; recreate the sandbox after
   changing capabilities.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
