@@ -5,7 +5,7 @@ kind: workload
 
 displayName: Pi coding agent
 description: Pi (pi-coding-agent) with Node.js, OpenRouter access through the sandbox proxy, and persistent sessions
-author: "Anthony O'Donnell <anthony.odonnell@outlook.com>"
+author: "Anthony O'Donnell"
 sourceUrl: https://github.com/odonnell-anthony/pi-agent-kit
 version: "1.0.0"
 licenses: [MIT]

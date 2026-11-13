@@ -217,7 +217,7 @@ omit `--sandbox` for all of them. IPs and CIDR prefixes are accepted:
 ```console
 sbx policy allow network --sandbox pi-kit 10.1.0.0/24
 sbx policy allow network --sandbox pi-kit 192.168.1.50:5432
-sbx policy ls                             # rules, scopes, and IDs
+sbx policy ls --wide                      # rules, scopes, and IDs
 sbx policy rm network --id <RULE_ID> --sandbox pi-kit --force
 ```
 
@@ -338,6 +338,11 @@ sbx run --name pi-kit docker.io/<NAMESPACE>/pi-agent@sha256:<digest>
   builder.
 - Existing sandboxes keep their original kit; recreate the sandbox after
   changing capabilities.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Report security issues per
+[SECURITY.md](SECURITY.md), not in public issues.
 
 ## License
 
