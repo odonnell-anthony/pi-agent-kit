@@ -1,4 +1,7 @@
 # ${GH_TOKEN} inside the /etc/gitconfig credential helper is intentionally
 # literal: git expands it at request time, not the build shell.
+# fd-find follows the pinned base image's apt archive; pinning a package
+# version would break the build whenever that archive moves.
 ignored:
   - SC2016
+  - DL3008
