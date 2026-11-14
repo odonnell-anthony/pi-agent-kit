@@ -11,7 +11,8 @@ A Docker Sandboxes v3 workload kit. `sbx` runs Pi in its own microVM with a
 restricted egress allow-list, proxy-managed credentials, and a persistent
 `~/.pi` volume. The kit pins a base image, installs
 `@earendil-works/pi-coding-agent`, and wires OpenRouter plus GitHub over HTTPS
-and SSH. It also seeds Pi's MCP config with the sandbox gateway.
+and SSH. It also seeds Pi's MCP config with the sandbox gateway, and exposes
+the host's shared skills store to Pi.
 
 It builds `docker.io/sbx/shell-image:latest`, pinned to its multi-arch index
 digest
@@ -194,6 +195,41 @@ Notes:
 - Local sandboxes use the local gateway. Cloud sandboxes use a separate cloud
   gateway; the install hook seeds whichever variables the runtime provides.
 
+## Skills
+
+Docker Sandboxes keeps a shared skills store on the host and links its entries
+into each sandbox. This kit exposes that store at `/home/agent/.agents/skills`,
+a location Pi discovers at startup.
+
+Install skills on the host:
+
+```console
+sbx skills add mattpocock/skills --skill grilling
+sbx skills import          # from ~/.agents/skills, ~/.claude/skills, ...
+sbx skills ls
+```
+
+Then create or restart a sandbox. Entries are linked read-only at container
+start, so a skill added to a running sandbox appears after its next start.
+
+```console
+sbx run --name pi-skills ./pi-agent
+sbx exec pi-skills -- bash -lc 'ls -l /home/agent/.agents/skills'
+```
+
+Notes:
+
+- Pi also discovers project skills in the mounted workspace at `.agents/skills`
+  and `.pi/skills`; those need no store.
+- `--skills=off` opts out for one sandbox. `--skills=readwrite` only shares
+  writes when the kit also asks for `readwrite`; this kit asks for `readonly`.
+- The skills directory is read-only inside the sandbox. Add and update skills
+  on the host with `sbx skills`.
+- Local sandboxes only. Cloud sandboxes do not support `agent-skills@1`; the
+  optional entry is skipped there.
+- Skills with `disable-model-invocation: true` are invoked explicitly, for
+  example `/skill:grilling`.
+
 ## Capabilities
 
 | Capability | Effect |
@@ -207,6 +243,7 @@ Notes:
 | `volume@1` | `/home/agent/.pi` (2g, block) persists sessions and settings across stop and restart |
 | `lifecycle@1` | writes `/home/agent/.pi/agent/settings.json` from the `model` and `thinking` arguments, and seeds `/home/agent/.pi/agent/mcp.json` from the gateway environment on creation |
 | `agent-context@2` | writes `/home/agent/.pi/agent/AGENTS.md` from the inline body (Pi's global instructions) |
+| `agent-skills@1` | exposes the host's shared skills store at `/home/agent/.agents/skills`; read-only, optional |
 | `agent-sessions@1` | declares headless `-p`, `--continue`, `--session` verbs. Declaration only: sbx accepts but does not execute them |
 | `agent-interactive-sessions@1` | declares TUI verbs. Optional; sbx ignores it |
 | `resources@1` | defaults to 4 CPU, 8 GiB |
@@ -238,6 +275,7 @@ The kit targets **local** sandboxes. Cloud (`sbx --cloud`) degrades:
 | `agent-context@2` | writes `/home/agent/.pi/agent/AGENTS.md` | writes one profile in `/home/agent`, so Pi does not load it |
 | `git-identity@1` | full | unsupported; optional, skipped |
 | `ssh-agent@1` | full | unsupported; optional, skipped |
+| `agent-skills@1` | shared host store at `/home/agent/.agents/skills` | unsupported; optional, skipped |
 | `volume@1` | block, survives stop and restart | ordinary sandbox disk |
 
 Use local sandboxes for full behaviour. MCP uses a separate gateway in cloud
@@ -332,6 +370,8 @@ A server must listen on `0.0.0.0` (or `::`) inside the sandbox, not on
 | `pi mcp list` reports a connection error, or the gateway returns 503 | Gateway listener lost after a `sandboxd` restart | Recreate the sandbox |
 | MCP server tools are missing | Server not attached | `sbx mcp ls`; attach with `--static-mcp` at create or `sbx mcp load` |
 | A server added directly with `pi mcp add` cannot connect | Its host is outside the kit network policy | Use `sbx mcp` (host-side gateway) instead, or add the host |
+| Skills are missing in the sandbox | Store not linked, empty, or disabled | `sbx skills ls`; restart the sandbox; check the `--skills` mode |
+| `/skill:name` is unknown | Skill not installed, or model invocation disabled | `sbx skills ls`; invoke `/skill:name` explicitly |
 | `gh auth login` prompts inside | Normal; do not log in | The proxy injects the token from `GH_TOKEN` |
 | New capability not applied | Existing sandboxes keep their original kit | Remove and recreate the sandbox |
 
@@ -402,6 +442,8 @@ sbx run --name pi-kit docker.io/<NAMESPACE>/pi-agent@sha256:<digest>
   `MCP_GATEWAY_URL` and `MCP_SENTINEL_TOKEN_NAME`, only when the file is absent
   or empty. The header value is a sentinel; the proxy substitutes the real
   credential.
+- Skills come from the host's shared store at `/home/agent/.agents/skills`,
+  read-only. The kit bundles no skill content.
 - Existing sandboxes keep their original kit; recreate the sandbox after
   changing capabilities.
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.0
+
+- Expose the host's shared skills store to Pi at `/home/agent/.agents/skills`
+  via `agent-skills@1`, read-only and optional.
+
 ## 1.1.0
 
 - Seed Pi's MCP config with the sandbox MCP gateway via a lifecycle install
