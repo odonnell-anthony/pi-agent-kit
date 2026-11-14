@@ -56,6 +56,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # arm64 is emulated on the amd64 runner. The image runs npm install once
+      # per platform, which is also what validates the arm64 tree.
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v4
         with:
@@ -68,6 +73,7 @@ jobs:
       - name: Build kit to an OCI layout
         run: |
           docker buildx build --builder kit-builder -f pi-agent.yaml \
+            --platform linux/amd64,linux/arm64 \
             -t pi-agent:ci \
             --output type=oci,dest=layout,tar=false .
 
