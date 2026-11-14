@@ -28,10 +28,10 @@ jobs:
       - name: Validate kit
         env:
           BUILDX_BUILDER: sbx-kit
-        run: sbx kit validate ./pi-agent
+        run: sbx kit validate .
 
       - name: Run smoke test
         env:
           BUILDX_BUILDER: sbx-kit
           PROMPT: ${{ inputs.prompt }}
-        run: ./pi-agent/scripts/smoke.sh
+        run: ./scripts/smoke.sh
