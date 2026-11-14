@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.3.0
+
+- Install `fd` in the image, so Pi's find tool does not download a release
+  binary that the egress policy blocks.
+- Allow `registry.npmjs.org`, so `pi install`, `pi update`, and startup package
+  fetches work, and allow `release-assets.githubusercontent.com`, where GitHub
+  release downloads redirect.
+- Merge the `model` and `thinking` arguments into `settings.json` at create
+  instead of rewriting the file, so packages and other settings survive a
+  re-create with a retained volume.
+- Install Pi as `agent`, so `pi update --self` can replace the package tree.
+- Bind prompts after `--` in the declared session verbs, so a prompt that starts
+  with a dash is not read as an option.
+- Fail the build when the installed Pi does not report the pinned version.
+- CI: pin the kit schema to a release commit, check that the descriptor and the
+  Dockerfile agree on the Pi version, build both architectures, and take
+  Dependabot updates.
+- Docs: correct the egress model, the model override examples, and the smoke
+  test paths.
+
 ## 1.2.0
 
 - Expose the host's shared skills store to Pi at `/home/agent/.agents/skills`

@@ -7,7 +7,7 @@ displayName: Pi coding agent
 description: Pi (pi-coding-agent) with Node.js, OpenRouter access through the sandbox proxy, and persistent sessions
 author: "Anthony O'Donnell"
 sourceUrl: https://github.com/odonnell-anthony/pi-agent-kit
-version: "1.2.0"
+version: "1.3.0"
 licenses: [MIT]
 
 args:
