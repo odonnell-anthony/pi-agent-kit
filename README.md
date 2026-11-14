@@ -178,9 +178,9 @@ The seeded file is `/home/agent/.pi/agent/mcp.json`:
 }
 ```
 
-The install hook writes it from `MCP_GATEWAY_URL` and `MCP_SENTINEL_TOKEN_NAME`,
-only when the file is absent or empty, so a file you manage is not overwritten
-at creation.
+The install hook runs once at create, before Pi launches, and writes it from
+`MCP_GATEWAY_URL` and `MCP_SENTINEL_TOKEN_NAME` only when the file is absent or
+empty, so a file you manage is not overwritten at creation.
 
 Notes:
 
@@ -444,6 +444,10 @@ sbx run --name pi-kit docker.io/<NAMESPACE>/pi-agent@sha256:<digest>
   credential.
 - Skills come from the host's shared store at `/home/agent/.agents/skills`,
   read-only. The kit bundles no skill content.
+- The kit declares no startup hooks and no `long-running@1`; the sandbox stops
+  after its last session disconnects.
+- Pi has no Claude/Codex-style agent hooks, so there is no desktop notification
+  or status line integration.
 - Existing sandboxes keep their original kit; recreate the sandbox after
   changing capabilities.
 
