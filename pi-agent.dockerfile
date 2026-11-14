@@ -32,14 +32,16 @@ RUN printf '%s\n' \
     && mkdir -p /home/agent/.pi/agent \
     && chown -R agent:agent /home/agent/.pi
 
+# The global npm prefix is agent-owned, so install as agent. Installing as root
+# would leave a root-owned tree that `pi update --self` cannot replace.
 # `pi --version` gates the build: npm only warns on an engines mismatch and
 # exits 0, so running the binary is what fails the build for a release this
 # image cannot execute.
+USER agent
 RUN npm install -g "@earendil-works/pi-coding-agent@${PI_VERSION}" \
     && npm cache clean --force \
     && test "$(pi --version)" = "${PI_VERSION}"
 
-USER agent
 ENV PI_SKIP_VERSION_CHECK=1 \
     PI_TELEMETRY=0 \
     GH_PAGER=cat \
