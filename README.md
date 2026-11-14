@@ -435,6 +435,9 @@ sbx run --name pi-kit docker.io/<NAMESPACE>/pi-agent@sha256:<digest>
   baked into the kit.
 - The base image is pinned by digest, and Dependabot proposes new ones. Apply
   them deliberately and run the smoke test.
+- Pi's own dependencies are resolved when the image builds, so two builds of the
+  same Pi release can carry different dependency versions. Running a published
+  digest fixes the set that a consumer gets.
 - `agent-interactive-sessions@1` is optional because `sbx` does not run declared
   session commands. Pi's TUI still starts from the image entrypoint.
 - `sbx kit validate --offline` fails for a v3 source kit, because that load
