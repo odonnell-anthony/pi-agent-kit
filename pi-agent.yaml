@@ -90,19 +90,36 @@ capabilities:
       size: 2g
       mode: "0755"
 
+  # Install hooks run once at create, unlike lifecycle files, which are written
+  # at every start and would overwrite the settings Pi saves. The hooks below
+  # write as agent, and the state volume can mount root-owned on a fresh
+  # sandbox, hence the leading chown.
   - type: com.docker.sandbox/lifecycle@1
     config:
-      files:
-        - path: /home/agent/.pi/agent/settings.json
-          content: |
-            {
-              "defaultProvider": "openrouter",
-              "defaultModel": "${{ kit.args.model }}",
-              "defaultThinkingLevel": "${{ kit.args.thinking }}",
-              "theme": "dark"
-            }
-          mode: "0644"
       install:
+        - user: "0"
+          description: Ensure the Pi state directory is agent-owned
+          command: |
+            mkdir -p /home/agent/.pi/agent
+            chown agent:agent /home/agent/.pi /home/agent/.pi/agent
+
+        # Merge rather than overwrite, so packages, themes and other keys Pi
+        # writes into settings.json survive a re-create with a retained volume.
+        - user: agent
+          description: Set the kit's Pi settings, keeping keys the kit does not own
+          command: |
+            set -e
+            f=/home/agent/.pi/agent/settings.json
+            [ -s "$f" ] || printf '%s\n' '{}' > "$f"
+            jq --arg model '${{ kit.args.model }}' \
+               --arg thinking '${{ kit.args.thinking }}' \
+               '.defaultProvider = "openrouter"
+                | .defaultModel = $model
+                | .defaultThinkingLevel = $thinking
+                | if has("theme") then . else .theme = "dark" end' \
+               "$f" > "$f.tmp"
+            mv "$f.tmp" "$f"
+
         - user: agent
           env: [MCP_GATEWAY_URL, MCP_SENTINEL_TOKEN_NAME]
           description: Seed Pi's MCP config with the sandbox gateway
