@@ -7,7 +7,7 @@ displayName: Pi coding agent
 description: Pi (pi-coding-agent) with Node.js, OpenRouter access through the sandbox proxy, and persistent sessions
 author: "Anthony O'Donnell"
 sourceUrl: https://github.com/odonnell-anthony/pi-agent-kit
-version: "1.1.0"
+version: "1.2.0"
 licenses: [MIT]
 
 args:
@@ -166,6 +166,14 @@ capabilities:
           `BASH_ENV` sources for every non-interactive Bash command.
         - Installed tooling comes from the kit image. Install extra packages with
           `sudo apt-get` or `npm install -g`; they last for the sandbox lifetime only.
+
+  # Pi discovers Agent Skills in ~/.agents/skills. Expose the host's shared
+  # skills store there; sbx manages the content and links it read-only.
+  - type: com.docker.sandbox/agent-skills@1
+    optional: true
+    config:
+      path: /home/agent/.agents/skills
+      mode: readonly
 
   - type: com.docker.sandbox/agent-sessions@1
     config:
