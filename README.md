@@ -2,86 +2,96 @@
 
 [![build](https://img.shields.io/github/actions/workflow/status/odonnell-anthony/pi-agent-kit/ci.yml?branch=main&label=build)](https://github.com/odonnell-anthony/pi-agent-kit/actions/workflows/ci.yml)
 
-Run [Pi](https://pi.dev) in an isolated Docker Sandbox. This is a v3 workload kit
-for `sbx`, Docker's microVM sandbox CLI.
+Run [Pi](https://pi.dev) in an isolated Docker Sandbox. This is a v3 workload
+kit for `sbx`, Docker's microVM sandbox CLI.
 
 ## What it is
 
-A Docker Sandboxes v3 workload kit. `sbx` runs Pi in its own microVM with a
-restricted egress allow-list, proxy-managed credentials, and a persistent
-`~/.pi` volume. The kit pins a base image, installs
-`@earendil-works/pi-coding-agent`, and wires OpenRouter plus GitHub over HTTPS
-and SSH. It also seeds Pi's MCP config with the sandbox gateway, and exposes
-the host's shared skills store to Pi.
+`sbx` runs Pi in its own microVM. The kit builds an image with Pi installed, and
+declares what the sandbox needs:
 
-It builds `docker.io/sbx/shell-image:latest`, pinned to its multi-arch index
-digest
-(`sha256:8953132089940e30f1387cfe8e77b504356ebbe48e02b15eed28e935f20ee732`;
-Ubuntu 26.04, Node 22.22.1, git, rg, python3, `agent` user uid 1000), plus
-`@earendil-works/pi-coding-agent` installed globally under
-`/usr/local/share/npm-global`, with `pi` as the launch command.
+- OpenRouter requests go through the host proxy, so the real key never enters
+  the sandbox.
+- GitHub works over HTTPS and SSH. `git` and `gh` authenticate through the proxy
+  or the host ssh-agent.
+- Pi reads the sandbox MCP gateway from its own config, and the host's shared
+  skills store from `/home/agent/.agents/skills`.
+- `/home/agent/.pi` is a 2 GB volume, so sessions and settings survive a stop
+  and restart.
 
-> **Not a regular Docker project.** `sbx` has its own CLI, kit format, and
-> capability model. Do not use `docker-compose`, `docker run`, or Dockerfile
-> testing workflows. Use `sbx kit validate`, `sbx run`, and `sbx exec`. See
-> <https://docs.docker.com/ai/sandboxes/>.
+The image starts from `docker.io/sbx/shell-image:latest`, pinned to its
+multi-arch digest
+`sha256:8953132089940e30f1387cfe8e77b504356ebbe48e02b15eed28e935f20ee732`.
+That image provides Ubuntu 26.04, Node 22.22.1, git, `rg`, `jq`, `gh`,
+python3, and the `agent` user with uid 1000. The kit adds `fd` and installs
+`@earendil-works/pi-coding-agent` under `/usr/local/share/npm-global`. `pi` is
+the entrypoint.
+
+This is not the official Pi kit. `docker/sbx-kits-contrib` ships a v2 kit,
+`docker.io/sbx/pi-kit`, which uses Anthropic credentials and a rolling image.
+This kit uses the v3 capability model, pins the Pi release, and adds OpenRouter,
+GitHub, MCP, and the shared skills store.
+
+`sbx` is not Docker Compose. It has its own CLI, kit format, and capability
+model, so `docker-compose`, `docker run`, and Dockerfile test loops do not apply.
+Use `sbx kit validate`, `sbx run`, and `sbx exec`. See
+<https://docs.docker.com/ai/sandboxes/>.
 
 ## Quick start
 
-Requires `sbx` v0.51.0 or later, an OCI-capable Buildx builder, and credential
-bindings. See [Requirements](#requirements) and [Prerequisites](#prerequisites).
-
-Examples assume the kit is at `./pi-agent` relative to the directory you run
-from; adjust the path to where you cloned it. `sbx` mounts the current directory
-as the workspace unless you pass another path.
+This needs `sbx` v0.51.0 or later, an OCI-capable Buildx builder, and credential
+bindings. See [Requirements](#requirements) and
+[Prerequisites](#prerequisites). The examples assume the kit is at `./pi-agent`.
+`sbx` mounts the current directory as the workspace unless you pass another
+path.
 
 ```console
-# one-time: create the builder
+# once: create the builder
 docker buildx create --name sbx-kit --driver docker-container
 export BUILDX_BUILDER=sbx-kit
 
-# validate and run (workspace = current directory)
+# validate and run
 sbx kit validate ./pi-agent
 sbx run --name pi-kit ./pi-agent
 ```
 
-Headless, with stdin closed:
+Run a prompt with stdin closed:
 
 ```console
 sbx exec pi-kit -- pi-headless -p "list the files in this repo"
 ```
 
-Change the model per sandbox. A sandbox keeps the kit arguments it was created
-with.
+A sandbox keeps the kit arguments it was created with, so change the model by
+creating a new sandbox:
 
 ```console
-sbx run --name pi-opus ./pi-agent --kit-arg model=anthropic/claude-opus-latest
+sbx run --name pi-opus ./pi-agent --kit-arg model='~anthropic/claude-opus-latest'
 ```
 
 ## Requirements
 
-- `sbx` v0.51.0 or later. `agent-context@2` needs v0.51.0; `git-identity@1` and
-  `ssh-agent@1` need v0.48.0.
+- `sbx` v0.51.0 or later. `agent-context@2` needs v0.51.0, and `git-identity@1`
+  and `ssh-agent@1` need v0.48.0.
 - Docker with an OCI-capable Buildx builder.
 - Host Git `user.name` and `user.email` for commit attribution.
-- An OpenRouter API key, and a GitHub credential or SSH key for GitHub access.
+- An OpenRouter API key. A GitHub credential or SSH key is needed for GitHub
+  access only.
 
-Hosts: Linux and macOS, on `linux/amd64` and `linux/arm64`.
+Linux and macOS on `linux/amd64` and `linux/arm64` are supported.
 
 ## Prerequisites
 
-Host buildx needs an OCI-capable builder, because `sbx` builds source kits with
-`docker buildx build --output type=oci`, which the `docker` driver cannot
-export:
+`sbx` builds source kits with `docker buildx build --output type=oci`, which the
+`docker` driver cannot export. Use a container driver:
 
 ```console
 docker buildx create --name sbx-kit --driver docker-container
 export BUILDX_BUILDER=sbx-kit
 ```
 
-Add the export to `.bashrc` to keep it across shells.
+Add the export to `.bashrc` if you want it in every shell.
 
-The kit needs approved credential bindings, recorded in
+Store credentials and approve their bindings. `sbx` records bindings in
 `~/.config/sbx/credentials.yaml`:
 
 ```yaml
@@ -94,8 +104,8 @@ bindings:
       domains: [github.com, api.github.com, uploads.github.com]
 ```
 
-The values come from `sbx secret set openrouter` and `sbx secret set github`.
-The GitHub secret can track the host CLI:
+Set the values with `sbx secret set openrouter` and `sbx secret set github`. The
+GitHub secret can follow the host CLI:
 
 ```console
 sbx secret set github --command 'gh auth token'
@@ -103,64 +113,59 @@ sbx secret set github --command 'gh auth token'
 
 ## Configuration
 
-The kit exposes three arguments:
+The kit takes three arguments.
 
 | Argument | Default | Notes |
 | --- | --- | --- |
 | `model` | `deepseek/deepseek-v4.1-flash-1017` | OpenRouter model ID |
 | `thinking` | `high` | `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` |
-| `version` | `1.5.2` | Pi release, applied as a build arg |
+| `version` | `1.5.2` | Pi release, applied as a build argument |
 
-Pass them with `--kit-arg name=value`. Use `--kit-arg kit.name=value` to target
-one kit when several are composed. Arguments are baked when the sandbox is
-created; change them by creating a new named sandbox.
+Pass them with `--kit-arg name=value`, or `--kit-arg kit.name=value` when several
+kits are composed. Arguments are fixed at creation. Create a new named sandbox
+to change them.
 
-If the default model is unavailable on your account, override it:
+Override the model if the default is unavailable on your account:
 
 ```console
-sbx run --name pi-kit ./pi-agent --kit-arg model=anthropic/claude-sonnet-latest
+sbx run --name pi-kit ./pi-agent --kit-arg model='~anthropic/claude-sonnet-latest'
 ```
 
 ## Headless prompts
 
-Pi reads stdin before running a one-shot prompt: piped input is prepended to the
-prompt. A terminal keeps stdin open, so `sbx exec ... -- pi -p "x"` produces no
-output and blocks until `sbx` reports `context canceled`.
+Pi reads stdin before it runs a one-shot prompt, and prepends piped input to the
+prompt. A terminal keeps stdin open, so `sbx exec ... -- pi -p "x"` prints
+nothing and blocks until `sbx` reports `context canceled`.
 
-Always close stdin, or use the bundled wrapper:
+Close stdin, or use the wrapper:
 
 ```console
-sbx exec pi-kit -- bash -lc 'pi -p "x" </dev/null'   # explicit
-sbx exec pi-kit -- pi-headless -p "x"                # same, wrapped
+sbx exec pi-kit -- bash -lc 'pi -p "x" </dev/null'
+sbx exec pi-kit -- pi-headless -p "x"
 ```
 
-`pi-headless` is `/usr/local/bin/pi-headless` in the image: `exec pi "$@" </dev/null`.
-Interactive `pi` (the TUI) is unaffected; do not use the wrapper for it.
+`pi-headless` is `/usr/local/bin/pi-headless` in the image, which runs
+`exec pi "$@" </dev/null`. The interactive TUI does not need it.
 
 ## MCP servers
 
-Docker Sandboxes runs an MCP gateway in every sandbox and keeps server
-registrations on the host. This kit seeds Pi's user MCP config with that
-gateway on creation, so Pi sees whatever servers the sandbox exposes.
+Every sandbox has an MCP gateway, and `sbx` keeps server registrations on the
+host. The kit's install hook writes the gateway into Pi's user MCP config at
+create, so Pi sees the servers the sandbox exposes.
 
-Register a server once on the host, then attach it at creation:
+Register a server on the host, then attach it at create:
 
 ```console
 sbx mcp add notion --url https://mcp.notion.com/mcp
 sbx run --name pi-mcp --static-mcp notion ./pi-agent
 ```
 
-Without `--static-mcp` the sandbox is in dynamic mode and Pi sees the gateway
+Without `--static-mcp` the sandbox runs in dynamic mode and Pi gets the gateway
 tools `mcp-find`, `mcp-add`, and `mcp-config-set`. Attach a server to a running
-sandbox:
+sandbox, then check what Pi sees:
 
 ```console
 sbx mcp load notion --sandbox pi-mcp
-```
-
-Check what Pi sees:
-
-```console
 sbx exec pi-mcp -- bash -lc 'pi mcp list'
 ```
 
@@ -178,223 +183,220 @@ The seeded file is `/home/agent/.pi/agent/mcp.json`:
 }
 ```
 
-The install hook runs once at create, before Pi launches, and writes it from
-`MCP_GATEWAY_URL` and `MCP_SENTINEL_TOKEN_NAME` only when the file is absent or
-empty, so a file you manage is not overwritten at creation.
+The hook writes it from `MCP_GATEWAY_URL` and `MCP_SENTINEL_TOKEN_NAME` only when
+the file is absent or empty, so a file you manage is left alone at creation.
 
-Notes:
+Things to know:
 
 - MCP traffic goes through the gateway. The sandbox reaches
-  `mcp-gateway.docker.internal` through the sandbox proxy; the host-side gateway
-  talks to the servers. The kit's network policy does not need the MCP hosts.
+  `mcp-gateway.docker.internal` through the sandbox proxy, and the host-side
+  gateway talks to the servers, so the kit's network policy needs no MCP hosts.
 - Local stdio servers run on the host with host permissions. Register only
-  trusted commands.
-- Add servers with `sbx mcp`, not `pi mcp add`. A server added directly in Pi's
-  config must pass the kit's network policy to connect.
-- Disable MCP for a session with `pi --no-mcp`, or remove the seeded file.
-- Local sandboxes use the local gateway. Cloud sandboxes use a separate cloud
-  gateway; the install hook seeds whichever variables the runtime provides.
+  commands you trust.
+- Add servers with `sbx mcp`, not `pi mcp add`. A server you add in Pi's config
+  must pass the host network policy to connect.
+- `pi --no-mcp` disables MCP for one session. Deleting the seeded file does the
+  same for every session.
+- Local sandboxes use the local gateway. Cloud sandboxes use a separate gateway,
+  and the hook seeds whichever variables the runtime provides.
 
 ## Skills
 
-Docker Sandboxes keeps a shared skills store on the host and links its entries
-into each sandbox. This kit exposes that store at `/home/agent/.agents/skills`,
-a location Pi discovers at startup.
+`sbx` keeps a shared skills store on the host and links its entries into each
+sandbox. The kit exposes that store at `/home/agent/.agents/skills`, where Pi
+looks at startup.
 
-Install skills on the host:
+Add skills on the host:
 
 ```console
 sbx skills add mattpocock/skills --skill grilling
-sbx skills import          # from ~/.agents/skills, ~/.claude/skills, ...
+sbx skills import
 sbx skills ls
 ```
 
-Then create or restart a sandbox. Entries are linked read-only at container
-start, so a skill added to a running sandbox appears after its next start.
+Then create or restart a sandbox. `sbx` links the entries read-only at container
+start, so a skill added to a running sandbox appears after its next start:
 
 ```console
 sbx run --name pi-skills ./pi-agent
 sbx exec pi-skills -- bash -lc 'ls -l /home/agent/.agents/skills'
 ```
 
-Notes:
+Things to know:
 
-- Pi also discovers project skills in the mounted workspace at `.agents/skills`
-  and `.pi/skills`; those need no store.
+- Pi also reads project skills from `.agents/skills` and `.pi/skills` in the
+  mounted workspace. Those need no store.
 - `--skills=off` opts out for one sandbox. `--skills=readwrite` only shares
-  writes when the kit also asks for `readwrite`; this kit asks for `readonly`.
-- The skills directory is read-only inside the sandbox. Add and update skills
-  on the host with `sbx skills`.
-- Local sandboxes only. Cloud sandboxes do not support `agent-skills@1`; the
-  optional entry is skipped there.
-- Skills with `disable-model-invocation: true` are invoked explicitly, for
+  writes when the kit also asks for `readwrite`, and this kit asks for
+  `readonly`.
+- The skills directory is read-only inside the sandbox. Add and update skills on
+  the host with `sbx skills`.
+- Cloud sandboxes do not support `agent-skills@1`, so the optional entry is
+  skipped there.
+- A skill with `disable-model-invocation: true` is invoked explicitly, for
   example `/skill:grilling`.
 
 ## Capabilities
 
 | Capability | Effect |
 | --- | --- |
-| `sbx@1` | sbx launches `pi` under bash as `agent`; provides `WORKSPACE_DIR`, `SANDBOX_NAME`, `SANDBOX_ID`, `IS_SANDBOX` |
-| `network-policy@2` | runtime egress limited to `openrouter.ai`, `github.com` (443 and 22), `ssh.github.com`, `api.github.com`, `uploads.github.com`, `codeload.github.com`, `objects.githubusercontent.com` |
-| `credential@1` (openrouter) | `OPENROUTER_API_KEY` holds the sentinel `proxy-managed`; host proxy sets `Authorization: Bearer <real key>` on `openrouter.ai` |
-| `credential@1` (github) | `GH_TOKEN` holds a sentinel; proxy injects the real token on `github.com`, `api.github.com`, `uploads.github.com`. `gh` is preinstalled in the base image |
-| `ssh-agent@1` | host ssh-agent forwarded into the sandbox; bounded to `git` signatures and `git@github.com` logins. Private keys never enter the sandbox |
-| `git-identity@1` | commit `user.name` / `user.email` come from the host Git config |
-| `volume@1` | `/home/agent/.pi` (2g, block) persists sessions and settings across stop and restart |
-| `lifecycle@1` | writes `/home/agent/.pi/agent/settings.json` from the `model` and `thinking` arguments, and seeds `/home/agent/.pi/agent/mcp.json` from the gateway environment on creation |
-| `agent-context@2` | writes `/home/agent/.pi/agent/AGENTS.md` from the inline body (Pi's global instructions) |
-| `agent-skills@1` | exposes the host's shared skills store at `/home/agent/.agents/skills`; read-only, optional |
-| `agent-sessions@1` | declares headless `-p`, `--continue`, `--session` verbs. Declaration only: sbx accepts but does not execute them |
-| `agent-interactive-sessions@1` | declares TUI verbs. Optional; sbx ignores it |
-| `resources@1` | defaults to 4 CPU, 8 GiB |
+| `sbx@1` | `sbx` launches `pi` under bash as `agent` and provides `WORKSPACE_DIR`, `SANDBOX_NAME`, `SANDBOX_ID`, `IS_SANDBOX` |
+| `network-policy@2` | Adds these hosts to the host policy: `openrouter.ai`, `github.com` (443 and 22), `ssh.github.com`, `api.github.com`, `uploads.github.com`, `codeload.github.com`, `objects.githubusercontent.com`, `release-assets.githubusercontent.com`, `registry.npmjs.org`. The host policy decides the rest |
+| `credential@1` (openrouter) | `OPENROUTER_API_KEY` holds the sentinel `proxy-managed`, and the host proxy sets `Authorization: Bearer <real key>` on `openrouter.ai` |
+| `credential@1` (github) | `GH_TOKEN` holds a sentinel, and the proxy injects the real token on `github.com`, `api.github.com`, `uploads.github.com`. `gh` is in the base image |
+| `ssh-agent@1` | Forwards the host ssh-agent into the sandbox at `/run/ssh-agent.sock`, bounded to `git` signatures and `git@github.com` logins. Private keys stay on the host |
+| `git-identity@1` | Commit `user.name` and `user.email` come from the host Git config |
+| `volume@1` | `/home/agent/.pi` (2 GB, block) holds sessions and settings across stop and restart |
+| `lifecycle@1` | At create, merges the `model` and `thinking` arguments into `/home/agent/.pi/agent/settings.json` and seeds `/home/agent/.pi/agent/mcp.json` from the gateway environment |
+| `agent-context@2` | Writes `/home/agent/.pi/agent/AGENTS.md` from the inline body, which Pi loads as global instructions |
+| `agent-skills@1` | Exposes the host's shared skills store at `/home/agent/.agents/skills`, read-only and optional |
+| `agent-sessions@1` | Declares headless `-p`, `--continue`, and `--session` verbs. `sbx` accepts the declaration and runs none of it |
+| `agent-interactive-sessions@1` | Declares the TUI verbs. Optional, and `sbx` ignores it |
+| `resources@1` | 4 CPU and 8 GiB by default |
 
 ## Git and GitHub
 
-Both transports work; the kit does not rewrite remotes.
+Both transports work, and the kit leaves remotes alone.
 
-- **HTTPS** is proxy-managed. `gh` and `git` authenticate with the sentinel in
-  `GH_TOKEN`; never run `gh auth login` inside a sandbox.
-- **SSH** uses the host agent, forwarded into the sandbox at
-  `/run/ssh-agent.sock`. `git@github.com:` remotes use it, so private keys stay
-  on the host. Egress to `github.com:22` is allowed. The key must be registered
-  on the GitHub account:
+HTTPS is proxy-managed. `git` and `gh` authenticate with the sentinel in
+`GH_TOKEN`, and the proxy replaces the header with the real token, so do not run
+`gh auth login` inside a sandbox.
 
-  ```console
-  gh ssh-key add ~/.ssh/id_ed25519.pub --title "$(hostname)"
-  ```
+SSH uses the host agent, forwarded to `/run/ssh-agent.sock`. Remotes of the form
+`git@github.com:` use it, and egress to `github.com:22` is allowed. The key must
+be registered on the GitHub account:
+
+```console
+gh ssh-key add ~/.ssh/id_ed25519.pub --title "$(hostname)"
+```
 
 ## Local vs cloud
 
-The kit targets **local** sandboxes. Cloud (`sbx --cloud`) degrades:
+The kit targets local sandboxes. Cloud sandboxes, started with `sbx --cloud`,
+degrade:
 
 | Capability | Local | Cloud |
 | --- | --- | --- |
-| `sbx@1`, `resources@1` | full | CPU/memory applied |
-| `network-policy@2` | full | host rules only; no HTTP method/path rules |
+| `sbx@1`, `resources@1` | full | CPU and memory applied |
+| `network-policy@2` | full | host rules only, without HTTP method and path rules |
 | `credential@1` | full | install-scoped credentials persist after setup |
-| `agent-context@2` | writes `/home/agent/.pi/agent/AGENTS.md` | writes one profile in `/home/agent`, so Pi does not load it |
-| `git-identity@1` | full | unsupported; optional, skipped |
-| `ssh-agent@1` | full | unsupported; optional, skipped |
-| `agent-skills@1` | shared host store at `/home/agent/.agents/skills` | unsupported; optional, skipped |
-| `volume@1` | block, survives stop and restart | ordinary sandbox disk |
+| `agent-context@2` | writes `/home/agent/.pi/agent/AGENTS.md` | writes one profile in `/home/agent`, which Pi does not load |
+| `git-identity@1` | full | unsupported, optional entry skipped |
+| `ssh-agent@1` | full | unsupported, optional entry skipped |
+| `agent-skills@1` | shared host store at `/home/agent/.agents/skills` | unsupported, optional entry skipped |
+| `volume@1` | block volume, survives stop and restart | ordinary sandbox disk |
 
 Use local sandboxes for full behaviour. MCP uses a separate gateway in cloud
-sandboxes; the kit seeds whichever gateway variables the runtime provides.
+sandboxes, and the hook seeds whichever gateway variables the runtime provides.
 
 ## Data and sessions
 
 Pi state lives in `/home/agent/.pi`: sessions, `settings.json`, `AGENTS.md`, and
 the seeded `mcp.json`. That path is a `volume@1` block volume, scoped to the
-sandbox name and preserved across `sbx stop` and a restart.
+sandbox name and kept across `sbx stop` and a restart.
 
-- **Sessions**: resume inside the sandbox with `pi --session <id>` or
-  `pi --continue`. `agent-sessions@1` is declaration-only here, so `sbx` never
-  runs the declared verbs.
-- **Reset**: treat `sbx rm` as a reset. Some sbx versions reattach the volume
-  when you recreate the same name; confirm with `sbx rm --help`. `sbx reset`
-  clears all sandbox state.
+Sessions resume inside the sandbox with `pi --session <id>` or `pi --continue`.
+`agent-sessions@1` is declaration-only here, so `sbx` never runs those verbs.
+
+Treat `sbx rm` as a reset. Version 0.51 starts a re-created name with an empty
+volume, while the specification requires a runtime to keep it, so check the
+behaviour of your version before relying on retained state.
 
 ## Extending
 
-`npm install -g` and `apt-get` inside a sandbox last only for that sandbox. For
-tools that must persist, package them in a v3 mixin and add it at creation:
+`npm install -g` and `apt-get` inside a sandbox last for that sandbox only, and
+need the host policy to allow the registry or archive you use. For tools that
+must persist, package them in a v3 mixin:
 
 ```console
 sbx run --name pi-kit ./pi-agent --kit ./my-tool-mixin
 ```
 
-Pi extensions, skills, and prompt templates placed under `/home/agent/.pi` are
-volume-backed and survive restarts.
+Pi extensions, skills, and prompt templates under `/home/agent/.pi` sit on the
+volume and survive restarts.
 
-## Local network access
+## Network access and ports
 
-Sandboxes can reach the LAN only when policy allows it. Grant per sandbox, or
-omit `--sandbox` for all of them. IPs and CIDR prefixes are accepted:
+A sandbox reaches the LAN only when the host policy allows it. Rules apply
+within about five seconds and need no restart:
 
 ```console
 sbx policy allow network --sandbox pi-kit 10.1.0.0/24
 sbx policy allow network --sandbox pi-kit 192.168.1.50:5432
-sbx policy ls --wide                      # rules, scopes, and IDs
+sbx policy ls --wide
 sbx policy rm network --id <RULE_ID> --sandbox pi-kit --force
 ```
 
-Policy rules apply within about five seconds, no restart needed. The host's LAN
-address is reachable, and so is any service it binds on `0.0.0.0`.
-
-A host service bound only to `127.0.0.1` is not reachable that way. The kit
-route for that is the `host-port@1` capability, which relays one host loopback
-port to `127.0.0.1:<port>` inside the sandbox and must be declared per port:
+A service bound to `127.0.0.1` on the host is not reachable this way. Use the
+`host-port@1` capability to relay one loopback port, declared per port:
 
 ```yaml
   - type: com.docker.sandbox/host-port@1
     config: {host: 5432, container: 15432, transport: tcp}
 ```
 
-## Publish ports to the host or the LAN
-
-A sandbox port is not reachable from the host until it is published. The host
-side is chosen at publish time; the kit needs no declaration:
+A sandbox port is not reachable until it is published. The host side is chosen
+at publish time, so the kit declares nothing:
 
 ```console
-sbx ports pi-kit --publish 8080:3000            # loopback only (127.0.0.1:8080)
-sbx ports pi-kit --publish 0.0.0.0:8080:3000    # all interfaces, visible on the LAN
-sbx ports pi-kit --publish 3000                 # host picks an ephemeral port
-sbx ports pi-kit                                # list mappings
+sbx ports pi-kit --publish 8080:3000
+sbx ports pi-kit --publish 0.0.0.0:8080:3000
+sbx ports pi-kit
 sbx ports pi-kit --unpublish 0.0.0.0:8080:3000/tcp4
 ```
 
-The binding is done by the host-side `sbx` process, so `0.0.0.0` exposes the
-sandbox service to your LAN exactly like any local server would, with no extra
-firewall rule. Unpublish with the same protocol suffix that `sbx ports` reports,
-otherwise the mapping is left behind.
-
-For the usual dev loop inside the sandbox:
+The host-side `sbx` process makes the binding, so `0.0.0.0` exposes the sandbox
+service on the LAN like any local server. Unpublish with the protocol suffix
+`sbx ports` reports, or the mapping stays behind. Inside the sandbox, bind dev
+servers to `0.0.0.0`, or the forwarded connection is refused:
 
 ```console
 sbx exec -it pi-kit -- bash -lc 'cd "$WORKSPACE_DIR" && npm run dev -- --host 0.0.0.0'
 ```
 
-A server must listen on `0.0.0.0` (or `::`) inside the sandbox, not on
-`127.0.0.1`, or the forwarded connection is refused.
-
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| `OCI exporter is not supported for the docker driver` | Buildx is using the docker driver | `docker buildx create --name sbx-kit --driver docker-container`, export `BUILDX_BUILDER=sbx-kit` |
-| `pi -p` prints nothing and hangs, then `context canceled` | Pi blocks on open stdin | `pi -p "..." </dev/null`, or use `pi-headless` |
-| `401` or model not found on first prompt | OpenRouter binding missing or model unavailable | `sbx secret set openrouter`; override `--kit-arg model=...` |
-| `Permission denied (publickey)` over SSH | Host key not on GitHub, or agent not forwarded | `gh ssh-key add ...`; enable SSH-agent forwarding |
-| Host unreachable, connection refused | Host not in the network policy | `sbx policy allow network --sandbox pi-kit <host>` |
-| Published port not reachable | Service bound to `127.0.0.1` | Bind `0.0.0.0` inside the sandbox |
-| `pi mcp list` reports a connection error, or the gateway returns 503 | Gateway listener lost after a `sandboxd` restart | Recreate the sandbox |
-| MCP server tools are missing | Server not attached | `sbx mcp ls`; attach with `--static-mcp` at create or `sbx mcp load` |
-| A server added directly with `pi mcp add` cannot connect | Its host is outside the kit network policy | Use `sbx mcp` (host-side gateway) instead, or add the host |
-| Skills are missing in the sandbox | Store not linked, empty, or disabled | `sbx skills ls`; restart the sandbox; check the `--skills` mode |
-| `/skill:name` is unknown | Skill not installed, or model invocation disabled | `sbx skills ls`; invoke `/skill:name` explicitly |
-| `gh auth login` prompts inside | Normal; do not log in | The proxy injects the token from `GH_TOKEN` |
-| New capability not applied | Existing sandboxes keep their original kit | Remove and recreate the sandbox |
+| `OCI exporter is not supported for the docker driver` | Buildx uses the docker driver | `docker buildx create --name sbx-kit --driver docker-container`, then export `BUILDX_BUILDER=sbx-kit` |
+| `pi -p` prints nothing and hangs, then `context canceled` | Pi is waiting for EOF on stdin | `pi -p "..." </dev/null`, or use `pi-headless` |
+| `401`, or the model is not found on the first prompt | OpenRouter binding missing, or the model is unavailable | `sbx secret set openrouter`; override `--kit-arg model=...` with an ID from `https://openrouter.ai/models` |
+| `npm install` or `apt-get` inside the sandbox fails to reach its registry | The host policy blocks that host | `sbx policy allow network --sandbox pi-kit <host>` |
+| `Permission denied (publickey)` over SSH | Host key not on GitHub, or the agent is not forwarded | `gh ssh-key add ...`; enable ssh-agent forwarding |
+| A host is unreachable | The host is in neither the kit list nor the host policy | `sbx policy allow network --sandbox pi-kit <host>` |
+| A published port is not reachable | The service is bound to `127.0.0.1` | Bind `0.0.0.0` inside the sandbox |
+| `pi mcp list` reports a connection error, or the gateway returns 503 | The gateway listener was lost after a `sandboxd` restart | Recreate the sandbox |
+| MCP server tools are missing | The server is not attached | `sbx mcp ls`; attach with `--static-mcp` or `sbx mcp load` |
+| A server added with `pi mcp add` cannot connect | Its host is outside the host policy | Use `sbx mcp`, which goes through the host-side gateway, or allow the host |
+| Skills are missing | Store not linked, empty, or disabled | `sbx skills ls`; restart the sandbox; check the `--skills` mode |
+| `/skill:name` is unknown | Skill not installed, or model invocation is disabled | `sbx skills ls`; invoke `/skill:name` explicitly |
+| `gh auth login` prompts inside the sandbox | Normal | Do not log in. The proxy injects the token from `GH_TOKEN` |
+| A new capability does not apply | Existing sandboxes keep their original kit | Remove and recreate the sandbox |
 
 ## CI
 
 `.github/workflows/ci.yml` runs on every push and pull request:
 
-- JSON-schema validation of `pi-agent.yaml` against the upstream v3 schema.
+- Schema validation of `pi-agent.yaml` against the kit schema, pinned to the
+  commit behind tag `v3.0.0-m.12`.
+- A check that the Pi version in `pi-agent.yaml` matches `ARG PI_VERSION` in
+  `pi-agent.dockerfile`.
 - `yamllint --strict`, `shellcheck`, and `hadolint`.
-- A Buildx OCI build. The `# syntax=docker/sandbox-kit:3` frontend validates the
-  descriptor and capability shape during the build.
+- A Buildx OCI build for `linux/amd64` and `linux/arm64`. The
+  `# syntax=docker/sandbox-kit:3` frontend validates the descriptor and
+  capability shape during the build.
 
 `.github/workflows/smoke.yml` is manual (`workflow_dispatch`). It runs
-`scripts/smoke.sh` on a self-hosted runner with `sbx`, KVM, a `sbx-kit`
-container builder, and credential bindings. GitHub-hosted runners cannot run it
+`scripts/smoke.sh` on a self-hosted runner with `sbx`, KVM, a container builder
+named `sbx-kit`, and credential bindings. GitHub-hosted runners cannot run it,
 because sandboxes need KVM.
+
+Dependabot proposes updates for the base image digest and the actions.
 
 Run the same checks locally:
 
 ```console
-uvx check-jsonschema --schemafile \
-  https://raw.githubusercontent.com/docker/sandbox-kit-spec/main/schema/kit.schema.json \
-  pi-agent.yaml
+uvx check-jsonschema --schemafile https://raw.githubusercontent.com/docker/sandbox-kit-spec/6b0bc2504942eb9335447d5035425536d9c495d6/schema/kit.schema.json pi-agent.yaml
 uvx yamllint --strict -c .yamllint pi-agent.yaml
 shellcheck scripts/smoke.sh
 docker run --rm -i hadolint/hadolint < pi-agent.dockerfile
@@ -408,12 +410,12 @@ docker login
 docker buildx build . -f pi-agent.yaml \
   --platform linux/amd64,linux/arm64 \
   --provenance=mode=min \
-  -t docker.io/<NAMESPACE>/pi-agent:1.0.0 --push
-sbx kit sign docker.io/<NAMESPACE>/pi-agent:1.0.0
-sbx kit verify docker.io/<NAMESPACE>/pi-agent:1.0.0
+  -t docker.io/<NAMESPACE>/pi-agent:<VERSION> --push
+sbx kit sign docker.io/<NAMESPACE>/pi-agent:<VERSION>
+sbx kit verify docker.io/<NAMESPACE>/pi-agent:<VERSION>
 ```
 
-Publish the digest, not just the tag, and have consumers verify:
+Publish the digest, not only the tag, and have consumers verify before running:
 
 ```console
 sbx kit verify docker.io/<NAMESPACE>/pi-agent@sha256:<digest>
@@ -422,34 +424,31 @@ sbx run --name pi-kit docker.io/<NAMESPACE>/pi-agent@sha256:<digest>
 
 ## Notes
 
-- `PI_SKIP_VERSION_CHECK=1` and `PI_TELEMETRY=0` are set in the image; the
-  version check would otherwise fail against the restricted network policy.
-- GitHub access is HTTPS and SSH. `/etc/gitconfig` supplies a credential helper
-  that returns the `GH_TOKEN` sentinel for `https://github.com`; the proxy
-  overwrites the header with a real `Authorization: Bearer`. SSH uses the
-  forwarded host agent, so the GitHub account needs the public key registered.
-- Add hosts to the network-policy capability if Pi must reach anything else;
-  use `sbx policy allow network` for LAN addresses you do not want baked into
-  the kit.
-- The base image is pinned by digest. Update the `FROM` line deliberately when
-  moving to a newer `shell-image`.
-- `agent-interactive-sessions@1` is optional because Docker Sandboxes does not
-  execute declared session commands; Pi's TUI still launches from the image
-  entrypoint.
-- `sbx kit validate --offline` does not work for v3 source kits; it needs the
-  builder.
-- The install hook seeds `/home/agent/.pi/agent/mcp.json` from
-  `MCP_GATEWAY_URL` and `MCP_SENTINEL_TOKEN_NAME`, only when the file is absent
-  or empty. The header value is a sentinel; the proxy substitutes the real
-  credential.
-- Skills come from the host's shared store at `/home/agent/.agents/skills`,
-  read-only. The kit bundles no skill content.
-- The kit declares no startup hooks and no `long-running@1`; the sandbox stops
-  after its last session disconnects.
-- Pi has no Claude/Codex-style agent hooks, so there is no desktop notification
-  or status line integration.
-- Existing sandboxes keep their original kit; recreate the sandbox after
-  changing capabilities.
+- `PI_SKIP_VERSION_CHECK=1` and `PI_TELEMETRY=0` are set in the image. The
+  version check would otherwise fail when the network policy blocks it.
+- `/etc/gitconfig` supplies a credential helper that returns the `GH_TOKEN`
+  sentinel for `https://github.com`. The proxy replaces the header with a real
+  `Authorization: Bearer`. SSH uses the forwarded host agent, so the GitHub
+  account needs the public key registered.
+- Add hosts to the network-policy capability when Pi must reach them in every
+  sandbox. Use `sbx policy allow network` for LAN addresses that should not be
+  baked into the kit.
+- The base image is pinned by digest, and Dependabot proposes new ones. Apply
+  them deliberately and run the smoke test.
+- `agent-interactive-sessions@1` is optional because `sbx` does not run declared
+  session commands. Pi's TUI still starts from the image entrypoint.
+- `sbx kit validate --offline` fails for a v3 source kit, because that load
+  path has no kit builder. Validate through the builder instead.
+- The MCP hook writes a sentinel as the header value, and the proxy substitutes
+  the real credential.
+- The kit bundles no skills. Pi reads the host's shared store, which `sbx`
+  mounts read-only.
+- The kit declares no startup hooks and no `long-running@1`, so the sandbox
+  stops after its last session disconnects.
+- Pi has no Claude or Codex style agent hooks, so the kit has no desktop
+  notification or status line integration.
+- Existing sandboxes keep the kit they were created with, so recreate a sandbox
+  after changing capabilities.
 
 ## Contributing
 
