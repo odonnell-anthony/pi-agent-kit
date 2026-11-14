@@ -1,0 +1,12 @@
+version: 2
+updates:
+  # Proposes a base image digest and the Pi ARG. The smoke test is the check.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
