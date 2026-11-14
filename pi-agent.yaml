@@ -163,11 +163,15 @@ capabilities:
           forwarded ssh-agent at `/run/ssh-agent.sock`. The agent is bounded: it only
           signs `git` namespaced data and only authenticates to `git@github.com`. Keys
           cannot be read or exported from the agent.
-        - Runtime egress is limited to `openrouter.ai`, `github.com` (443 and 22),
-          `ssh.github.com`, `api.github.com`, `uploads.github.com`,
-          `codeload.github.com`, and `objects.githubusercontent.com`. Other hosts fail
-          unless the host added a policy rule for them (for example a LAN CIDR with
-          `sbx policy allow network --sandbox <name> 10.1.0.0/24`).
+        - Runtime egress is governed by two policies. The kit allows `openrouter.ai`,
+          `github.com` (443 and 22), `ssh.github.com`, `api.github.com`,
+          `uploads.github.com`, `codeload.github.com`,
+          `objects.githubusercontent.com`, `release-assets.githubusercontent.com`,
+          and `registry.npmjs.org`. The host policy adds its own rules, which on a
+          default install allow common developer hosts. The kit's list is what the
+          kit needs, not the sandbox boundary. Add a host with
+          `sbx policy allow network --sandbox <name> <host or CIDR>`, and do not
+          assume an unlisted host is unreachable.
         - A sandbox port is reachable from the host only after publication:
           `sbx ports <name> --publish 0.0.0.0:8080:3000`. Bind dev servers to `0.0.0.0`
           inside the sandbox, not `127.0.0.1`.
@@ -183,8 +187,11 @@ capabilities:
           which does that. Interactive `pi` is unaffected.
         - Exports needed by later shells belong in `/etc/sandbox-persistent.sh`, which
           `BASH_ENV` sources for every non-interactive Bash command.
-        - Installed tooling comes from the kit image. Install extra packages with
-          `sudo apt-get` or `npm install -g`; they last for the sandbox lifetime only.
+        - Installed tooling comes from the kit image, including `fd`, `rg`, `jq`,
+          `git`, `gh`, and Node. Extra packages from `sudo apt-get` or
+          `npm install -g` last for the sandbox lifetime only, and need the host
+          policy to allow that archive or registry. `pi install npm:<package>`
+          writes to settings and `registry.npmjs.org` is allowed.
 
   # Pi discovers Agent Skills in ~/.agents/skills. Expose the host's shared
   # skills store there; sbx manages the content and links it read-only.
