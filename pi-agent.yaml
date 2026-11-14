@@ -194,9 +194,12 @@ capabilities:
       path: /home/agent/.agents/skills
       mode: readonly
 
+  # `--` ends option parsing, so a prompt that begins with a dash reaches Pi as a
+  # message. sbx accepts these verbs without executing them; a runtime that does
+  # execute the headless one must close stdin, or Pi waits for EOF.
   - type: com.docker.sandbox/agent-sessions@1
     config:
-      prompt: ["-p", "{{.Prompt}}"]
+      prompt: ["-p", "--", "{{.Prompt}}"]
       continue: ["--continue"]
       resume: ["--session", "{{.SessionID}}"]
 
@@ -206,7 +209,7 @@ capabilities:
   - type: com.docker.sandbox/agent-interactive-sessions@1
     optional: true
     config:
-      prompt: ["{{.Prompt}}"]
+      prompt: ["--", "{{.Prompt}}"]
       resume: ["--session", "{{.SessionID}}"]
       continue: ["--continue"]
       newSession: []
