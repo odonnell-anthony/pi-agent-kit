@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.1
+
+- Move the base image pin to the 2026-11-17 index digest. The base now carries
+  `gh` 2.104.0. Ubuntu 26.04, Node 22.22.1, the other base tools, and the agent
+  user are unchanged.
+
 ## 1.3.0
 
 - Install `fd` in the image, so Pi's find tool does not download a release
