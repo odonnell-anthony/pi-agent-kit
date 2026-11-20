@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.4
+
+- Move the base image pin to the 2026-11-20 index digest. This is a nightly
+  rebuild of the same base recipe: `gh` 2.105.0, Ubuntu 26.04, Node 22.22.1,
+  git, `rg`, `jq`, python3, and the agent user report the same versions as the
+  previous pin. Pi stays at 1.5.2, which is the current npm release.
+
 ## 1.3.3
 
 - Move the base image pin to the 2026-11-19 index digest. This is a nightly
