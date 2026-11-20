@@ -21,7 +21,7 @@ declares what the sandbox needs:
 
 The image starts from `docker.io/sbx/shell-image:latest`, pinned to its
 multi-arch digest
-`sha256:97af175f1aafb9824aef7abfff17bebe468c7edf8d900d8de455c30aaaf7cb67`.
+`sha256:dafc9c63407f0c658966aab65078750e7e58ec9265d73c100d84b958f7600006`.
 That image provides Ubuntu 26.04, Node 22.22.1, git, `rg`, `jq`, `gh`,
 python3, and the `agent` user with uid 1000. The kit adds `fd` and installs
 `@earendil-works/pi-coding-agent` under `/usr/local/share/npm-global`. `pi` is
