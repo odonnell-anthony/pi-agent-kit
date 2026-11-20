@@ -2,7 +2,7 @@
 # reproducibility. Update deliberately when moving to a new base image.
 FROM docker.io/sbx/shell-image:latest@sha256:dafc9c63407f0c658966aab65078750e7e58ec9265d73c100d84b958f7600006
 
-ARG PI_VERSION=1.5.2
+ARG PI_VERSION=1.6.0
 
 USER root
 
