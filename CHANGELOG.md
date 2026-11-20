@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.4.0
+
+- Move Pi to 1.6.0. The base image digest is unchanged. Upstream adds the
+  GPT-6.2 Astra and GPT-6.2 Sol models and makes Sol the default on the
+  `openai`, `azure`, and `openai-codex` providers, adds `deepseek-v4.1-flash`
+  and `deepseek-v4.1-flash-1017` to the Qwen Token Plan providers, updates
+  `undici` to 8.12.4 for six security advisories, and makes extension
+  `render()` return `readonly string[]`. The kit's OpenRouter default model is
+  unchanged, and the kit uses no extensions, so no configuration changes are
+  needed.
+
 ## 1.3.4
 
 - Move the base image pin to the 2026-11-20 index digest. This is a nightly

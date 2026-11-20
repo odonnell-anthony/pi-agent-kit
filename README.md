@@ -119,7 +119,7 @@ The kit takes three arguments.
 | --- | --- | --- |
 | `model` | `deepseek/deepseek-v4.1-flash-1017` | OpenRouter model ID |
 | `thinking` | `high` | `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` |
-| `version` | `1.5.2` | Pi release, applied as a build argument |
+| `version` | `1.6.0` | Pi release, applied as a build argument |
 
 Pass them with `--kit-arg name=value`, or `--kit-arg kit.name=value` when several
 kits are composed. Arguments are fixed at creation. Create a new named sandbox
