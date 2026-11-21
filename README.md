@@ -452,9 +452,11 @@ sbx kit verify docker.io/odonnellanthony/pi-agent:<VERSION> \
 
 Signing is keyless by default and needs an interactive OIDC login. The identity
 and issuer come from the account used at that login; this kit signs through
-GitHub. Pass `--key cosign.key` to `sbx kit sign` and `--key cosign.pub` to
-`sbx kit verify` for key-based signing. Docker Hub supports the OCI referrers
-API, so the signature attaches to the image manifest.
+GitHub. `<signer-email>` is the email of that account, and every verifier must
+pass the same value. Pass `--key cosign.key` to `sbx kit sign` and
+`--key cosign.pub` to `sbx kit verify` for key-based signing. Docker Hub
+supports the OCI referrers API, so the signature attaches to the image
+manifest.
 
 Publish the digest, not only the tag, and have consumers verify before running:
 
