@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- Docs: make the published image optional. Document the three kit sources with
+  their requirements: local directory, Git tag, and published image. A Git
+  source needs its publisher in `kit.allowedSources`, which defaults to
+  `docker.io/` and `dhi.io/`.
+- Docs: name the Docker Hub namespace in the publish section and replace the
+  placeholder verify identity with the GitHub signer identity and issuer the
+  image is signed with. The previous example used a Google issuer, which fails
+  verification.
+- Publish 1.4.0 to Docker Hub as a signed multi-arch image. The signature is
+  keyless and attaches as an OCI referrer. The tag and digest are in the README.
+
 ## 1.4.0
 
 - Move Pi to 1.6.0. The base image digest is unchanged. Upstream adds the
