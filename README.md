@@ -55,6 +55,33 @@ sbx kit validate ./pi-agent
 sbx run --name pi-kit ./pi-agent
 ```
 
+### Kit sources
+
+The kit runs from source. A published image is optional: it saves the build and
+enables signature verification, and changes nothing about the sandbox.
+
+| Source | Reference | Requirement |
+| --- | --- | --- |
+| Local directory | `./pi-agent` | None beyond the build requirements |
+| GitHub | `git+https://github.com/odonnell-anthony/pi-agent-kit.git#ref=v1.4.0` | The publisher must be in `kit.allowedSources` |
+| Published image | `docker.io/odonnellanthony/pi-agent@sha256:<digest>` | Optional. See [Publishing an image](#publishing-an-image-optional) |
+
+A Git source needs its publisher allowed. The default allowlist is Docker Hub
+and `dhi.io` only:
+
+```console
+sbx settings set kit.allowedSources '["docker.io/","dhi.io/","github.com/odonnell-anthony/"]'
+```
+
+`ref` accepts a tag or branch, not a commit SHA. Omit `dir` when the kit is at
+the repository root. A Git source takes its kit name from the repository name,
+so arguments are targeted as `pi-agent-kit.model`, while the published image
+uses `pi-agent.model`.
+
+```console
+sbx run --name pi-kit "git+https://github.com/odonnell-anthony/pi-agent-kit.git#ref=v1.4.0"
+```
+
 Run a prompt with stdin closed:
 
 ```console
@@ -76,6 +103,8 @@ sbx run --name pi-opus ./pi-agent --kit-arg model='~anthropic/claude-opus-latest
 - Host Git `user.name` and `user.email` for commit attribution.
 - An OpenRouter API key. A GitHub credential or SSH key is needed for GitHub
   access only.
+- For a Git source, the publisher in `kit.allowedSources`. The default allowlist
+  is `docker.io/` and `dhi.io/`, so `github.com/odonnell-anthony/` must be added.
 
 Linux and macOS on `linux/amd64` and `linux/arm64` are supported.
 
@@ -403,23 +432,37 @@ docker run --rm -i hadolint/hadolint < pi-agent.dockerfile
 BUILDX_BUILDER=sbx-kit ./scripts/smoke.sh
 ```
 
-## Publish
+## Publishing an image (optional)
+
+Publishing is not required to use the kit. Run from a local directory or the Git
+source instead. Publish an image when you want a pinned, signed artefact that
+others can pull without building.
 
 ```console
 docker login
 docker buildx build . -f pi-agent.yaml \
   --platform linux/amd64,linux/arm64 \
   --provenance=mode=min \
-  -t docker.io/<NAMESPACE>/pi-agent:<VERSION> --push
-sbx kit sign docker.io/<NAMESPACE>/pi-agent:<VERSION>
-sbx kit verify docker.io/<NAMESPACE>/pi-agent:<VERSION>
+  -t docker.io/odonnellanthony/pi-agent:<VERSION> --push
+sbx kit sign docker.io/odonnellanthony/pi-agent:<VERSION>
+sbx kit verify docker.io/odonnellanthony/pi-agent:<VERSION> \
+  --certificate-identity anthony.odonnell@outlook.com \
+  --certificate-oidc-issuer https://github.com/login/oauth
 ```
+
+Signing is keyless by default and needs an interactive OIDC login. The identity
+and issuer come from the account used at that login; this kit signs through
+GitHub. Pass `--key cosign.key` to `sbx kit sign` and `--key cosign.pub` to
+`sbx kit verify` for key-based signing. Docker Hub supports the OCI referrers
+API, so the signature attaches to the image manifest.
 
 Publish the digest, not only the tag, and have consumers verify before running:
 
 ```console
-sbx kit verify docker.io/<NAMESPACE>/pi-agent@sha256:<digest>
-sbx run --name pi-kit docker.io/<NAMESPACE>/pi-agent@sha256:<digest>
+sbx kit verify docker.io/odonnellanthony/pi-agent@sha256:<digest> \
+  --certificate-identity anthony.odonnell@outlook.com \
+  --certificate-oidc-issuer https://github.com/login/oauth
+sbx run --name pi-kit docker.io/odonnellanthony/pi-agent@sha256:<digest>
 ```
 
 ## Notes
@@ -437,7 +480,8 @@ sbx run --name pi-kit docker.io/<NAMESPACE>/pi-agent@sha256:<digest>
   them deliberately and run the smoke test.
 - Pi's own dependencies are resolved when the image builds, so two builds of the
   same Pi release can carry different dependency versions. Running a published
-  digest fixes the set that a consumer gets.
+  digest fixes the set that a consumer gets; a source kit resolves them at build
+  time. The published image is an option, not a requirement.
 - `agent-interactive-sessions@1` is optional because `sbx` does not run declared
   session commands. Pi's TUI still starts from the image entrypoint.
 - `sbx kit validate --offline` fails for a v3 source kit, because that load
