@@ -1,7 +1,11 @@
 # Changelog
 
-## Unreleased
+## 1.4.1
 
+- Move the base image pin to the 2026-11-21 index digest. This is a nightly
+  rebuild of the same base recipe: `gh` 2.105.0, Ubuntu 26.04, Node 22.22.1,
+  git, `rg`, `jq`, python3, and the agent user report the same versions as the
+  previous pin. Pi stays at 1.6.0, which is the current npm release.
 - Docs: make the published image optional. Document the three kit sources with
   their requirements: local directory, Git tag, and published image. A Git
   source needs its publisher in `kit.allowedSources`, which defaults to
@@ -10,8 +14,9 @@
   placeholder verify identity with the GitHub signer identity and issuer the
   image is signed with. The previous example used a Google issuer, which fails
   verification.
-- Publish 1.4.0 to Docker Hub as a signed multi-arch image. The signature is
-  keyless and attaches as an OCI referrer. The tag and digest are in the README.
+- Record the 1.4.0 Docker Hub publication: a signed multi-arch image, keyless
+  signature attached as an OCI referrer. 1.4.1 ships from GitHub only, so the
+  published image stays at 1.4.0.
 
 ## 1.4.0
 

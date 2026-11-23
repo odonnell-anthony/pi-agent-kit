@@ -21,7 +21,7 @@ declares what the sandbox needs:
 
 The image starts from `docker.io/sbx/shell-image:latest`, pinned to its
 multi-arch digest
-`sha256:dafc9c63407f0c658966aab65078750e7e58ec9265d73c100d84b958f7600006`.
+`sha256:b4a577059435f27d29bcd11f653c013ba4c0b7d46c9598651053f628c7740d56`.
 That image provides Ubuntu 26.04, Node 22.22.1, git, `rg`, `jq`, `gh`,
 python3, and the `agent` user with uid 1000. The kit adds `fd` and installs
 `@earendil-works/pi-coding-agent` under `/usr/local/share/npm-global`. `pi` is
@@ -63,7 +63,7 @@ enables signature verification, and changes nothing about the sandbox.
 | Source | Reference | Requirement |
 | --- | --- | --- |
 | Local directory | `./pi-agent` | None beyond the build requirements |
-| GitHub | `git+https://github.com/odonnell-anthony/pi-agent-kit.git#ref=v1.4.0` | The publisher must be in `kit.allowedSources` |
+| GitHub | `git+https://github.com/odonnell-anthony/pi-agent-kit.git#ref=v1.4.1` | The publisher must be in `kit.allowedSources` |
 | Published image | `docker.io/odonnellanthony/pi-agent@sha256:<digest>` | Optional. See [Publishing an image](#publishing-an-image-optional) |
 
 A Git source needs its publisher allowed. The default allowlist is Docker Hub
@@ -79,7 +79,7 @@ so arguments are targeted as `pi-agent-kit.model`, while the published image
 uses `pi-agent.model`.
 
 ```console
-sbx run --name pi-kit "git+https://github.com/odonnell-anthony/pi-agent-kit.git#ref=v1.4.0"
+sbx run --name pi-kit "git+https://github.com/odonnell-anthony/pi-agent-kit.git#ref=v1.4.1"
 ```
 
 Run a prompt with stdin closed:
