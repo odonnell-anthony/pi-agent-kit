@@ -64,11 +64,11 @@ enables signature verification, and changes nothing about the sandbox.
 | --- | --- | --- |
 | Local directory | `./pi-agent` | None beyond the build requirements |
 | GitHub | `git+https://github.com/odonnell-anthony/pi-agent-kit.git#ref=v1.4.4` | The publisher must be in `kit.allowedSources` |
-| Published image | `docker.io/odonnellanthony/pi-agent@sha256:<digest>` | Optional. See [Publishing an image](#publishing-an-image-optional) |
+| Published image | `docker.io/odonnellanthony/pi-agent@sha256:e7deccb3a38ee533ac9ae806ed670798e525a80e13423c9cff079331acd01b2c` | Optional. See [Publishing an image](#publishing-an-image-optional) |
 
-The published image trails the repository by design: a release publishes it
-only once its tag is pushed, and the digest for each published version is
-recorded in [Publishing an image](#publishing-an-image-optional).
+That digest is 1.4.4. A release publishes its image after the tag is pushed, so
+the digest for each version is recorded in
+[Publishing an image](#publishing-an-image-optional).
 
 A Git source needs its publisher allowed. The default allowlist is Docker Hub
 and `dhi.io` only:
@@ -421,8 +421,9 @@ sbx exec -it pi-kit -- bash -lc 'cd "$WORKSPACE_DIR" && npm run dev -- --host 0.
 
 `.github/workflows/publish.yml` runs on a `v<version>` tag. It publishes the
 image to Docker Hub, signs it keyless with the workflow's OIDC identity, and
-verifies the signature. It needs the `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`
-repository secrets; signing needs none.
+verifies the signature, retrying while Docker Hub's referrers index catches up.
+It needs the `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` repository secrets;
+signing needs none.
 
 
 `.github/workflows/smoke.yml` is manual (`workflow_dispatch`). It runs
@@ -466,20 +467,33 @@ tag ref. Docker Hub supports the OCI referrers API, so the signature attaches
 to the image manifest. Pass `--key cosign.key` to `sbx kit sign` and
 `--key cosign.pub` to `sbx kit verify` for key-based signing instead.
 
+Published versions:
+
+| Version | Digest |
+| --- | --- |
+| 1.4.4 | `sha256:e7deccb3a38ee533ac9ae806ed670798e525a80e13423c9cff079331acd01b2c` |
+| 1.4.3 | `sha256:d237be9952b5e3270d7ad80d5417c53c13d356f6faea43abcdde1747fc50b16a` |
+| 1.4.2 | `sha256:1379b9b41842121bca228869d05a4640bf4e9a6df68bd11c95a4223f98c69b59` |
+| 1.4.0 | `sha256:699bb03b8904f962a73e0895249eaa7f5e5b5be2ff8b5e5bbfece59875f6e159` |
+
 Verify before running, using the digest rather than the tag:
 
 ```console
-sbx kit verify docker.io/odonnellanthony/pi-agent@sha256:<digest> \
+sbx kit verify docker.io/odonnellanthony/pi-agent@sha256:e7deccb3a38ee533ac9ae806ed670798e525a80e13423c9cff079331acd01b2c \
   --certificate-identity \
     "https://github.com/odonnell-anthony/pi-agent-kit/.github/workflows/publish.yml@refs/tags/v1.4.4" \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
-sbx run --name pi-kit docker.io/odonnellanthony/pi-agent@sha256:<digest>
+sbx run --name pi-kit docker.io/odonnellanthony/pi-agent@sha256:e7deccb3a38ee533ac9ae806ed670798e525a80e13423c9cff079331acd01b2c
 ```
 
 The identity changes with each release, because it names the tag. The issuer
 does not. 1.4.0 predates the workflow and is signed by the maintainer's GitHub
 login instead, with identity `anthony.odonnell@outlook.com` and issuer
 `https://github.com/login/oauth`.
+
+The signature is published after the image, and Docker Hub's referrers index
+lags that push by seconds to minutes, so a verify run immediately after a
+release can read an empty index. Retry before treating an image as unsigned.
 
 ## Notes
 

@@ -7,6 +7,9 @@
   image for a signature that is already stored. The CI failure on the 1.4.2 and
   1.4.3 tags was that lag, not a missing signature; both verify from outside CI
   against the workflow identity for their tag.
+- Docs: record the published tag and digest for each version on Docker Hub, use
+  the current digest in the verify and run examples, and state the referrers lag
+  that the workflow retries through.
 
 ## 1.4.3
 
