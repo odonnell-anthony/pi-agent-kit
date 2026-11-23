@@ -1,0 +1,116 @@
+name: publish
+
+# Publishes the kit to Docker Hub as a signed multi-arch image. Runs on a
+# version tag, and on demand for a version whose tag already exists. Signing is
+# keyless through the workflow's own OIDC identity, so no signing secret is
+# stored: the certificate SAN is this workflow at the tag ref, and the issuer is
+# GitHub Actions.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to republish; dispatch with --ref v<version>
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  IMAGE: docker.io/odonnellanthony/pi-agent
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      digest: ${{ steps.publish.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # The keyless certificate binds the tag ref, so only a tag run can be
+      # verified with the identity the README documents.
+      - name: Check the ref is a release tag
+        run: |
+          if [ "$GITHUB_REF_TYPE" != tag ]; then
+            echo "publish runs from a v* tag, not $GITHUB_REF" >&2
+            exit 1
+          fi
+
+      # The descriptor is the source of truth for the release version, so a tag
+      # that does not match it is refused before anything is pushed.
+      - name: Resolve and check the version
+        id: version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if [ -n "${{ inputs.version }}" ] && [ "${{ inputs.version }}" != "$version" ]; then
+            echo "the ref is v$version, not the requested ${{ inputs.version }}" >&2
+            exit 1
+          fi
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "not a release version: $version" >&2
+            exit 1
+          fi
+          declared="$(python3 -c 'import yaml; print(yaml.safe_load(open("pi-agent.yaml"))["version"])')"
+          if [ "$declared" != "$version" ]; then
+            echo "pi-agent.yaml declares $declared, publishing $version" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
+        with:
+          name: kit-builder
+          driver: docker-container
+
+      # The same registry credentials sign the reference afterwards: `sbx kit
+      # sign` falls back to the Docker config, so no sbx login session is
+      # needed on the runner.
+      - name: Log in to Docker Hub
+        run: |
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" \
+            | docker login docker.io -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+      - name: Build and push
+        id: publish
+        run: |
+          docker buildx build --builder kit-builder -f pi-agent.yaml \
+            --platform linux/amd64,linux/arm64 \
+            --provenance=mode=min \
+            -t "${IMAGE}:${{ steps.version.outputs.version }}" \
+            --push .
+          digest="$(docker buildx imagetools inspect \
+            "${IMAGE}:${{ steps.version.outputs.version }}" \
+            --format '{{json .Manifest}}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["digest"])')"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "Published \`${IMAGE}:${{ steps.version.outputs.version }}\` at \`$digest\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install sbx
+        run: |
+          sudo install -m 0755 -d /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+            | sudo gpg --dearmor -o /etc/apt/keyrings/docker.asc
+          echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
+            | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq docker-sbx
+
+      # Keyless: the token comes from the runner's OIDC provider, so the
+      # certificate binds this workflow and tag rather than a long-lived key.
+      - name: Sign
+        run: sbx kit sign "${IMAGE}:${{ steps.version.outputs.version }}"
+
+      - name: Verify the signature and the published digest
+        run: |
+          sbx kit verify "${IMAGE}@${{ steps.publish.outputs.digest }}" \
+            --certificate-identity \
+              "https://github.com/${GITHUB_REPOSITORY}/.github/workflows/publish.yml@refs/tags/v${{ steps.version.outputs.version }}" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com
+          echo "Verified \`${IMAGE}@${{ steps.publish.outputs.digest }}\`" >> "$GITHUB_STEP_SUMMARY"

@@ -66,6 +66,10 @@ enables signature verification, and changes nothing about the sandbox.
 | GitHub | `git+https://github.com/odonnell-anthony/pi-agent-kit.git#ref=v1.4.1` | The publisher must be in `kit.allowedSources` |
 | Published image | `docker.io/odonnellanthony/pi-agent@sha256:<digest>` | Optional. See [Publishing an image](#publishing-an-image-optional) |
 
+The published image trails the repository by design: a release publishes it
+only once its tag is pushed, and the digest for each published version is
+recorded in [Publishing an image](#publishing-an-image-optional).
+
 A Git source needs its publisher allowed. The default allowlist is Docker Hub
 and `dhi.io` only:
 
@@ -415,6 +419,12 @@ sbx exec -it pi-kit -- bash -lc 'cd "$WORKSPACE_DIR" && npm run dev -- --host 0.
   `# syntax=docker/sandbox-kit:3` frontend validates the descriptor and
   capability shape during the build.
 
+`.github/workflows/publish.yml` runs on a `v<version>` tag. It publishes the
+image to Docker Hub, signs it keyless with the workflow's OIDC identity, and
+verifies the signature. It needs the `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`
+repository secrets; signing needs none.
+
+
 `.github/workflows/smoke.yml` is manual (`workflow_dispatch`). It runs
 `scripts/smoke.sh` on a self-hosted runner with `sbx`, KVM, a container builder
 named `sbx-kit`, and credential bindings. GitHub-hosted runners cannot run it,
@@ -438,34 +448,38 @@ Publishing is not required to use the kit. Run from a local directory or the Git
 source instead. Publish an image when you want a pinned, signed artefact that
 others can pull without building.
 
+`.github/workflows/publish.yml` publishes it. Pushing a `v<version>` tag builds
+`docker.io/odonnellanthony/pi-agent:<version>` for `linux/amd64` and
+`linux/arm64`, pushes it, signs it keyless, and verifies the signature before
+the job succeeds. The workflow refuses a tag that does not match `version` in
+`pi-agent.yaml`, and it runs on a GitHub-hosted runner, so no registry or
+signing secret is used for signing: the OIDC token comes from the runner.
+
+Republish an existing tag by dispatching the workflow at that tag:
+
 ```console
-docker login
-docker buildx build . -f pi-agent.yaml \
-  --platform linux/amd64,linux/arm64 \
-  --provenance=mode=min \
-  -t docker.io/odonnellanthony/pi-agent:<VERSION> --push
-sbx kit sign docker.io/odonnellanthony/pi-agent:<VERSION>
-sbx kit verify docker.io/odonnellanthony/pi-agent:<VERSION> \
-  --certificate-identity <signer-email> \
-  --certificate-oidc-issuer https://github.com/login/oauth
+gh workflow run publish.yml --ref v1.4.2
 ```
 
-Signing is keyless by default and needs an interactive OIDC login. The identity
-and issuer come from the account used at that login; this kit signs through
-GitHub. `<signer-email>` is the email of that account, and every verifier must
-pass the same value. Pass `--key cosign.key` to `sbx kit sign` and
-`--key cosign.pub` to `sbx kit verify` for key-based signing. Docker Hub
-supports the OCI referrers API, so the signature attaches to the image
-manifest.
+Signing is keyless, and the certificate identity is the workflow file at the
+tag ref. Docker Hub supports the OCI referrers API, so the signature attaches
+to the image manifest. Pass `--key cosign.key` to `sbx kit sign` and
+`--key cosign.pub` to `sbx kit verify` for key-based signing instead.
 
-Publish the digest, not only the tag, and have consumers verify before running:
+Verify before running, using the digest rather than the tag:
 
 ```console
 sbx kit verify docker.io/odonnellanthony/pi-agent@sha256:<digest> \
-  --certificate-identity <signer-email> \
-  --certificate-oidc-issuer https://github.com/login/oauth
+  --certificate-identity \
+    "https://github.com/odonnell-anthony/pi-agent-kit/.github/workflows/publish.yml@refs/tags/v1.4.2" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
 sbx run --name pi-kit docker.io/odonnellanthony/pi-agent@sha256:<digest>
 ```
+
+The identity changes with each release, because it names the tag. The issuer
+does not. 1.4.0 predates the workflow and is signed by the maintainer's GitHub
+login instead, with identity `anthony.odonnell@outlook.com` and issuer
+`https://github.com/login/oauth`.
 
 ## Notes
 
