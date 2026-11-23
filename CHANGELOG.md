@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.4.2
+
+- Publish the image to Docker Hub from CI. `.github/workflows/publish.yml` runs
+  on a `v<version>` tag, builds both architectures, pushes `<version>`, signs
+  it keyless with the workflow's own OIDC identity, and verifies the signature
+  before the job succeeds. The registry needs `DOCKERHUB_USERNAME` and
+  `DOCKERHUB_TOKEN` secrets; signing needs none, so no long-lived key is stored.
+- Docs: replace the manual publish procedure with the workflow and its dispatch
+  form for a republish, and document the signer identity, which is the workflow
+  file at the tag ref. 1.4.0 predates the workflow and is signed by the
+  maintainer's GitHub login, which the README now records.
+
 ## 1.4.1
 
 - Move the base image pin to the 2026-11-21 index digest. This is a nightly
