@@ -1,12 +1,20 @@
 # Changelog
 
+## 1.4.4
+
+- Retry the signature check for up to five minutes. Docker Hub's referrers
+  index lags the signature push, so an immediate read reports an unsigned
+  image for a signature that is already stored. The CI failure on the 1.4.2 and
+  1.4.3 tags was that lag, not a missing signature; both verify from outside CI
+  against the workflow identity for their tag.
+
 ## 1.4.3
 
-- Sign the published image after an `sbx login` session. 1.4.2 logged in to
-  Docker Hub with `docker login` only, and `sbx kit sign` reported success while
-  attaching no referrer, so the published image carried no signature. The
-  workflow now signs under the sbx session and still verifies the signature
-  before the job succeeds, which is what caught the missing referrer.
+- Sign after an `sbx login` session, the credential source `sbx kit sign`
+  prefers, and keep the published-digest check as a job gate. The gate failed on
+  the 1.4.2 and 1.4.3 tags although both signatures were attached, because
+  Docker Hub's referrers index lags the push. Both images verify from outside
+  CI; 1.4.4 makes the gate wait for the index.
 
 ## 1.4.2
 
