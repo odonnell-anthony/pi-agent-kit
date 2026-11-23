@@ -61,6 +61,16 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
+      - name: Install sbx
+        run: |
+          sudo install -m 0755 -d /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+            | sudo gpg --dearmor -o /etc/apt/keyrings/docker.asc
+          echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
+            | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq docker-sbx
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
 
@@ -70,13 +80,19 @@ jobs:
           name: kit-builder
           driver: docker-container
 
-      # The same registry credentials sign the reference afterwards: `sbx kit
-      # sign` falls back to the Docker config, so no sbx login session is
-      # needed on the runner.
+      # Buildx pushes with the Docker config. Signing needs the sbx session as
+      # well: with Docker credentials alone `sbx kit sign` reported success and
+      # attached no referrer, so the verify step below failed on a signature
+      # that was never published.
       - name: Log in to Docker Hub
         run: |
           echo "${{ secrets.DOCKERHUB_TOKEN }}" \
             | docker login docker.io -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+      - name: Log in to sbx
+        run: |
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" \
+            | sbx login --username "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
       - name: Build and push
         id: publish
@@ -91,16 +107,6 @@ jobs:
             --format '{{json .Manifest}}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["digest"])')"
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
           echo "Published \`${IMAGE}:${{ steps.version.outputs.version }}\` at \`$digest\`" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Install sbx
-        run: |
-          sudo install -m 0755 -d /etc/apt/keyrings
-          curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
-            | sudo gpg --dearmor -o /etc/apt/keyrings/docker.asc
-          echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
-            | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq docker-sbx
 
       # Keyless: the token comes from the runner's OIDC provider, so the
       # certificate binds this workflow and tag rather than a long-lived key.

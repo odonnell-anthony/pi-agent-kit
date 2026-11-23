@@ -63,7 +63,7 @@ enables signature verification, and changes nothing about the sandbox.
 | Source | Reference | Requirement |
 | --- | --- | --- |
 | Local directory | `./pi-agent` | None beyond the build requirements |
-| GitHub | `git+https://github.com/odonnell-anthony/pi-agent-kit.git#ref=v1.4.1` | The publisher must be in `kit.allowedSources` |
+| GitHub | `git+https://github.com/odonnell-anthony/pi-agent-kit.git#ref=v1.4.3` | The publisher must be in `kit.allowedSources` |
 | Published image | `docker.io/odonnellanthony/pi-agent@sha256:<digest>` | Optional. See [Publishing an image](#publishing-an-image-optional) |
 
 The published image trails the repository by design: a release publishes it
@@ -83,7 +83,7 @@ so arguments are targeted as `pi-agent-kit.model`, while the published image
 uses `pi-agent.model`.
 
 ```console
-sbx run --name pi-kit "git+https://github.com/odonnell-anthony/pi-agent-kit.git#ref=v1.4.1"
+sbx run --name pi-kit "git+https://github.com/odonnell-anthony/pi-agent-kit.git#ref=v1.4.3"
 ```
 
 Run a prompt with stdin closed:
@@ -458,7 +458,7 @@ signing secret is used for signing: the OIDC token comes from the runner.
 Republish an existing tag by dispatching the workflow at that tag:
 
 ```console
-gh workflow run publish.yml --ref v1.4.2
+gh workflow run publish.yml --ref v1.4.3
 ```
 
 Signing is keyless, and the certificate identity is the workflow file at the
@@ -471,7 +471,7 @@ Verify before running, using the digest rather than the tag:
 ```console
 sbx kit verify docker.io/odonnellanthony/pi-agent@sha256:<digest> \
   --certificate-identity \
-    "https://github.com/odonnell-anthony/pi-agent-kit/.github/workflows/publish.yml@refs/tags/v1.4.2" \
+    "https://github.com/odonnell-anthony/pi-agent-kit/.github/workflows/publish.yml@refs/tags/v1.4.3" \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 sbx run --name pi-kit docker.io/odonnellanthony/pi-agent@sha256:<digest>
 ```

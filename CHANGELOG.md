@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.3
+
+- Sign the published image after an `sbx login` session. 1.4.2 logged in to
+  Docker Hub with `docker login` only, and `sbx kit sign` reported success while
+  attaching no referrer, so the published image carried no signature. The
+  workflow now signs under the sbx session and still verifies the signature
+  before the job succeeds, which is what caught the missing referrer.
+
 ## 1.4.2
 
 - Publish the image to Docker Hub from CI. `.github/workflows/publish.yml` runs
