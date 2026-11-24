@@ -21,7 +21,7 @@ declares what the sandbox needs:
 
 The image starts from `docker.io/sbx/shell-image:latest`, pinned to its
 multi-arch digest
-`sha256:b4a577059435f27d29bcd11f653c013ba4c0b7d46c9598651053f628c7740d56`.
+`sha256:7d67875e1fa9f9b18121476a900b1ac30d5e5be24b497e205b8480d1319759c9`.
 That image provides Ubuntu 26.04, Node 22.22.1, git, `rg`, `jq`, `gh`,
 python3, and the `agent` user with uid 1000. The kit adds `fd` and installs
 `@earendil-works/pi-coding-agent` under `/usr/local/share/npm-global`. `pi` is
@@ -63,10 +63,10 @@ enables signature verification, and changes nothing about the sandbox.
 | Source | Reference | Requirement |
 | --- | --- | --- |
 | Local directory | `./pi-agent` | None beyond the build requirements |
-| GitHub | `git+https://github.com/odonnell-anthony/pi-agent-kit.git#ref=v1.4.4` | The publisher must be in `kit.allowedSources` |
+| GitHub | `git+https://github.com/odonnell-anthony/pi-agent-kit.git#ref=v1.4.5` | The publisher must be in `kit.allowedSources` |
 | Published image | `docker.io/odonnellanthony/pi-agent@sha256:e7deccb3a38ee533ac9ae806ed670798e525a80e13423c9cff079331acd01b2c` | Optional. See [Publishing an image](#publishing-an-image-optional) |
 
-That digest is 1.4.4. A release publishes its image after the tag is pushed, so
+That digest is 1.4.5. A release publishes its image after the tag is pushed, so
 the digest for each version is recorded in
 [Publishing an image](#publishing-an-image-optional).
 
@@ -83,7 +83,7 @@ so arguments are targeted as `pi-agent-kit.model`, while the published image
 uses `pi-agent.model`.
 
 ```console
-sbx run --name pi-kit "git+https://github.com/odonnell-anthony/pi-agent-kit.git#ref=v1.4.4"
+sbx run --name pi-kit "git+https://github.com/odonnell-anthony/pi-agent-kit.git#ref=v1.4.5"
 ```
 
 Run a prompt with stdin closed:
@@ -459,7 +459,7 @@ signing secret is used for signing: the OIDC token comes from the runner.
 Republish an existing tag by dispatching the workflow at that tag:
 
 ```console
-gh workflow run publish.yml --ref v1.4.4
+gh workflow run publish.yml --ref v1.4.5
 ```
 
 Signing is keyless, and the certificate identity is the workflow file at the

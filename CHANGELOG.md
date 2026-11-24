@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.4.5
+
+- Move the base image pin to the 2026-11-24 index digest. This is a nightly
+  rebuild of the same base recipe, and `tzdata` 2026e to 2026f is the only
+  package that changed. `gh` 2.105.0, Ubuntu 26.04, Node 22.22.1, npm 9.2.0,
+  git 2.53.0, `rg` 15.1.0, `jq` 1.8.1, python3 3.14.4, and the agent user with
+  uid 1000 report the same versions as the previous pin. Pi stays at 1.6.0,
+  which is the current npm release.
+- Publish 1.4.5 to Docker Hub from the tag workflow, so the published image,
+  its keyless signature, and the recorded digest match this source.
+
 ## 1.4.4
 
 - Retry the signature check for up to five minutes. Docker Hub's referrers
