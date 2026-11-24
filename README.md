@@ -64,7 +64,7 @@ enables signature verification, and changes nothing about the sandbox.
 | --- | --- | --- |
 | Local directory | `./pi-agent` | None beyond the build requirements |
 | GitHub | `git+https://github.com/odonnell-anthony/pi-agent-kit.git#ref=v1.4.5` | The publisher must be in `kit.allowedSources` |
-| Published image | `docker.io/odonnellanthony/pi-agent@sha256:e7deccb3a38ee533ac9ae806ed670798e525a80e13423c9cff079331acd01b2c` | Optional. See [Publishing an image](#publishing-an-image-optional) |
+| Published image | `docker.io/odonnellanthony/pi-agent@sha256:50725ac7e945ef2708889d4958b167da4fd83d5c2c4b6f0cf1cc18ef27c93f96` | Optional. See [Publishing an image](#publishing-an-image-optional) |
 
 That digest is 1.4.5. A release publishes its image after the tag is pushed, so
 the digest for each version is recorded in
@@ -471,6 +471,7 @@ Published versions:
 
 | Version | Digest |
 | --- | --- |
+| 1.4.5 | `sha256:50725ac7e945ef2708889d4958b167da4fd83d5c2c4b6f0cf1cc18ef27c93f96` |
 | 1.4.4 | `sha256:e7deccb3a38ee533ac9ae806ed670798e525a80e13423c9cff079331acd01b2c` |
 | 1.4.3 | `sha256:d237be9952b5e3270d7ad80d5417c53c13d356f6faea43abcdde1747fc50b16a` |
 | 1.4.2 | `sha256:1379b9b41842121bca228869d05a4640bf4e9a6df68bd11c95a4223f98c69b59` |
@@ -479,11 +480,11 @@ Published versions:
 Verify before running, using the digest rather than the tag:
 
 ```console
-sbx kit verify docker.io/odonnellanthony/pi-agent@sha256:e7deccb3a38ee533ac9ae806ed670798e525a80e13423c9cff079331acd01b2c \
+sbx kit verify docker.io/odonnellanthony/pi-agent@sha256:50725ac7e945ef2708889d4958b167da4fd83d5c2c4b6f0cf1cc18ef27c93f96 \
   --certificate-identity \
-    "https://github.com/odonnell-anthony/pi-agent-kit/.github/workflows/publish.yml@refs/tags/v1.4.4" \
+    "https://github.com/odonnell-anthony/pi-agent-kit/.github/workflows/publish.yml@refs/tags/v1.4.5" \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
-sbx run --name pi-kit docker.io/odonnellanthony/pi-agent@sha256:e7deccb3a38ee533ac9ae806ed670798e525a80e13423c9cff079331acd01b2c
+sbx run --name pi-kit docker.io/odonnellanthony/pi-agent@sha256:50725ac7e945ef2708889d4958b167da4fd83d5c2c4b6f0cf1cc18ef27c93f96
 ```
 
 The identity changes with each release, because it names the tag. The issuer
