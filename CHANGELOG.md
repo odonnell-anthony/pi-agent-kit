@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.4.6
+
+- Move the base image pin to the 2026-11-25 index digest. This is a nightly
+  rebuild of the same base recipe. `docker-ce-cli` 29.10.0 to 29.10.1 and
+  `libsqlite3-0` 3.46.1-9ubuntu0.3 to 3.46.1-9ubuntu0.4 are the only package
+  changes. Ubuntu 26.04.1, Node 22.22.1, npm 9.2.0, `gh` 2.105.0, git 2.53.0,
+  `rg` 15.1.0, `jq` 1.8.1, python3 3.14.4, `tzdata` 2026f, and the agent user
+  with uid 1000 report the same versions as the previous pin. Pi stays at
+  1.6.0, which is the current npm release.
+- Publish 1.4.6 to Docker Hub from the tag workflow, so the published image,
+  its keyless signature, and the recorded digest match this source.
+
 ## 1.4.5
 
 - Move the base image pin to the 2026-11-24 index digest. This is a nightly

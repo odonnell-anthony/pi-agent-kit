@@ -1,6 +1,6 @@
 # Pinned to the multi-arch index digest of sbx/shell-image:latest for
 # reproducibility. Update deliberately when moving to a new base image.
-FROM docker.io/sbx/shell-image:latest@sha256:7d67875e1fa9f9b18121476a900b1ac30d5e5be24b497e205b8480d1319759c9
+FROM docker.io/sbx/shell-image:latest@sha256:58e461a6d458a306b65f51033f84da5d254255352ac93a4e90968f6fe11c0331
 
 ARG PI_VERSION=1.6.0
 
