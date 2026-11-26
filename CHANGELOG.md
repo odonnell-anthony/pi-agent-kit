@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.5.0
+
+- Move Pi from 1.6.0 to 1.6.1. The release replaces the `showCacheMissNotices`
+  setting with `notices.cacheMisses`, `notices.cacheWarming`,
+  `notices.compactionCosts`, and `notices.reasoningDrops`; an existing
+  `showCacheMissNotices` value migrates to all four on read, and the
+  `SettingsManager.getShowCacheMissNotices()` and `setShowCacheMissNotices()`
+  API is removed. This kit sets only `defaultProvider`, `defaultModel`,
+  `defaultThinkingLevel`, and `theme`, so no descriptor change is needed. The
+  release also adds decision models to codemode, `blockedKind` on extension
+  dialogs, `full_output_error` on the bash tool, and retries or fixes for
+  Cloudflare 525, Anthropic `api_error`, OpenRouter empty responses, and Gemini
+  3+ providers, and it changes the default Mistral model to
+  `mistral-medium-latest` because Mistral retired Devstral.
+- Move the base image pin to the 2026-11-25 index digest. `gh` 2.105.0 to
+  2.106.0, the krb5 libraries 1.22.1-2ubuntu4.1 to 4.3, and `libexpat1`
+  2.7.4-1ubuntu0.2 to 0.3 are the only changes in the 618 installed packages.
+  Ubuntu 26.04.1, Node 22.22.1, npm 9.2.0, git 2.53.0, `rg` 15.1.0, `jq` 1.8.1,
+  python3 3.14.4, `tzdata` 2026f, `docker-ce-cli` 29.10.1, `libsqlite3-0`
+  3.46.1-9ubuntu0.4, and the agent user with uid 1000 report the same versions
+  as the previous pin.
+- The kit version is now 1.5.0: the minor bump covers the Pi release, and the
+  arguments, capabilities, network policy, and session verbs are unchanged.
+- Publish 1.5.0 to Docker Hub from the tag workflow, so the published image,
+  its keyless signature, and the recorded digest match this source.
+
 ## 1.4.6
 
 - Move the base image pin to the 2026-11-25 index digest. This is a nightly

@@ -21,7 +21,7 @@ declares what the sandbox needs:
 
 The image starts from `docker.io/sbx/shell-image:latest`, pinned to its
 multi-arch digest
-`sha256:58e461a6d458a306b65f51033f84da5d254255352ac93a4e90968f6fe11c0331`.
+`sha256:f047ad67e61b33410f70f3160c114a4bc8543232d39198224946ddc4ea2afad0`.
 That image provides Ubuntu 26.04, Node 22.22.1, git, `rg`, `jq`, `gh`,
 python3, and the `agent` user with uid 1000. The kit adds `fd` and installs
 `@earendil-works/pi-coding-agent` under `/usr/local/share/npm-global`. `pi` is
@@ -63,7 +63,7 @@ enables signature verification, and changes nothing about the sandbox.
 | Source | Reference | Requirement |
 | --- | --- | --- |
 | Local directory | `./pi-agent` | None beyond the build requirements |
-| GitHub | `git+https://github.com/odonnell-anthony/pi-agent-kit.git#ref=v1.4.6` | The publisher must be in `kit.allowedSources` |
+| GitHub | `git+https://github.com/odonnell-anthony/pi-agent-kit.git#ref=v1.5.0` | The publisher must be in `kit.allowedSources` |
 | Published image | `docker.io/odonnellanthony/pi-agent@sha256:b76ca9287e5765758f23cc053cf9694ff8ec8a5a539ac4b93cb4cbc49f40fef3` | Optional. See [Publishing an image](#publishing-an-image-optional) |
 
 That digest is 1.4.6. A release publishes its image after the tag is pushed, so
@@ -83,7 +83,7 @@ so arguments are targeted as `pi-agent-kit.model`, while the published image
 uses `pi-agent.model`.
 
 ```console
-sbx run --name pi-kit "git+https://github.com/odonnell-anthony/pi-agent-kit.git#ref=v1.4.6"
+sbx run --name pi-kit "git+https://github.com/odonnell-anthony/pi-agent-kit.git#ref=v1.5.0"
 ```
 
 Run a prompt with stdin closed:
@@ -459,7 +459,7 @@ signing secret is used for signing: the OIDC token comes from the runner.
 Republish an existing tag by dispatching the workflow at that tag:
 
 ```console
-gh workflow run publish.yml --ref v1.4.6
+gh workflow run publish.yml --ref v1.5.0
 ```
 
 Signing is keyless, and the certificate identity is the workflow file at the
