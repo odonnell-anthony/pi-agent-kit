@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.5.1
+
+- Move the base image pin to the 2026-11-27 index digest. This is a nightly
+  rebuild of the same base recipe. `binutils` 2.46-3ubuntu2 to 2.46-3ubuntu2.1
+  across the eight packages that carry it (`binutils`, `binutils-common`,
+  `binutils-x86-64-linux-gnu`, `libbinutils`, `libctf-nobfd0`, `libctf0`,
+  `libgprofng0`, `libsframe3`) are the only changes in the 618 installed
+  packages. Ubuntu 26.04.1, Node 22.22.1, npm 9.2.0, `gh` 2.106.0, git 2.53.0,
+  `rg` 15.1.0, `jq` 1.8.1, python3 3.14.4, `tzdata` 2026f, `docker-ce-cli`
+  29.10.1, `libsqlite3-0` 3.46.1-9ubuntu0.4, and the agent user with uid 1000
+  report the same versions as the previous pin. Pi stays at 1.6.1, which is the
+  current npm release.
+- The kit version is now 1.5.1: the patch bump covers a digest-only move, and
+  the arguments, capabilities, network policy, and session verbs are unchanged.
+- Publish 1.5.1 to Docker Hub from the tag workflow, so the published image,
+  its keyless signature, and the recorded digest match this source.
+
 ## 1.5.0
 
 - Move Pi from 1.6.0 to 1.6.1. The release replaces the `showCacheMissNotices`
